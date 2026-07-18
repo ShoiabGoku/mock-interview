@@ -41,10 +41,17 @@ export default function InterviewRoom() {
 
   // Each finalized phrase streams straight into the answer box, so a long
   // spoken answer accumulates instead of being cut off at the first pause.
-  const { listening, interim, error: sttError, start: startRec, stop: stopRec, supported: sttSupported } =
-    useSpeechRecognition((text) =>
-      setInput((prev) => (prev ? prev.replace(/\s+$/, "") + " " : "") + text)
-    );
+  const {
+    listening,
+    status: voiceStatus,
+    interim,
+    error: sttError,
+    start: startRec,
+    stop: stopRec,
+    supported: sttSupported,
+  } = useSpeechRecognition((text) =>
+    setInput((prev) => (prev ? prev.replace(/\s+$/, "") + " " : "") + text)
+  );
 
   // ---- init engine + opening line ----
   useEffect(() => {
@@ -242,12 +249,19 @@ export default function InterviewRoom() {
         {phase !== "ended" && (
           <div className="glass border-t p-3">
             {listening && (
-              <p className="mb-2 text-xs text-accent">
-                🎙️ Listening — keep talking, pauses are fine. Click the mic again when you&apos;re done.
-                {interim && <span className="ml-1 italic text-muted">{interim}</span>}
+              <p className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className={cn("h-2 w-2 rounded-full", voiceStatus === "listening" ? "animate-pulse bg-success" : "bg-warning")} />
+                <span className="text-accent">
+                  {voiceStatus === "reconnecting" || voiceStatus === "starting"
+                    ? "Reconnecting mic — keep talking…"
+                    : "Listening — pauses are fine, it keeps going. Click the mic again when you're done."}
+                </span>
+                {interim && <span className="italic text-muted">{interim}</span>}
               </p>
             )}
-            {sttError && <p className="mb-2 text-xs text-danger">{sttError}</p>}
+            {sttError && (
+              <p className="mb-2 rounded-lg bg-danger/10 p-2 text-xs text-danger">{sttError}</p>
+            )}
             <div className="flex items-end gap-2">
               <textarea
                 value={input}
