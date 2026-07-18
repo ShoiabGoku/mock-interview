@@ -33,6 +33,8 @@ export interface PlannedItem {
   followUpsAsked: number;
   /** Times the panel pushed back on a one-line answer. */
   retries: number;
+  /** Times the candidate said they don't know this one. */
+  unsureCount: number;
 }
 
 export interface EnginePlan {
@@ -71,6 +73,7 @@ export class ScriptedEngine {
         interviewer: pickInterviewer(company.panel, bankQ.category),
         followUpsAsked: 0,
         retries: 0,
+        unsureCount: 0,
       })),
     };
   }
@@ -127,16 +130,27 @@ export class ScriptedEngine {
     const followUpBudget = hardMode ? 2 : 1;
 
     // How the interviewer reacts to what was actually said.
-    const { text: reaction, band } = reactionTo(raw, quality, item.interviewer, this.config.difficulty);
+    const { text: reaction, band, retry } = reactionTo(
+      raw,
+      quality,
+      item.interviewer,
+      this.config.difficulty,
+      answer,
+      item.unsureCount > 0
+    );
+    if (band === "unsure") item.unsureCount++;
 
-    // A one-line answer gets pushed on rather than accepted — like a real panel.
-    if (band === "punt" && item.retries < 1) {
+    // Stay on this question when the panel offered a steer or asked them to
+    // expand — a real interviewer gives you a second go before moving on.
+    if (retry && item.retries < 1) {
       item.retries++;
       return { interviewer: item.interviewer, text: reaction, interruption: false, done: false };
     }
 
-    // Decide: ask a follow-up, or move on.
+    // Never grill someone with follow-ups on a question they've said they
+    // don't know — move the interview along instead.
     const wantFollowUp =
+      band !== "unsure" &&
       item.followUpsAsked < followUpBudget &&
       item.bankQ.followUps.length > item.followUpsAsked &&
       (quality < 0.62 || (hardMode && quality < 0.85 && item.followUpsAsked === 0));
@@ -187,14 +201,14 @@ export class ScriptedEngine {
     const raw = this.lastRaw;
     const q = answerQuality(raw);
     const covered = Math.round(raw.coverage * 100);
+    // Notes are visible to the candidate, so they must not name the concepts
+    // that were missed — that would give the answer away mid-interview.
     notes[item.interviewer.id] =
       q > 0.7
         ? `Strong — hit ${covered}% of key points.`
         : q > 0.45
         ? `Partial (${covered}%); probing further.`
-        : raw.missing.length
-        ? `Gap: ${raw.missing[0]}.`
-        : "Thin answer; flagged.";
+        : "Gaps here; flagged for review.";
     return notes;
   }
 
@@ -293,11 +307,61 @@ export class ScriptedEngine {
 
 // ---------------- helpers ----------------
 
+/** People-facing categories an HR/recruiting panelist can credibly ask about. */
+const PEOPLE_CATEGORIES: Category[] = ["hr", "behavioral", "resume", "project"];
+
+/**
+ * Adjacent topics used to find a credible asker when nobody on the panel
+ * explicitly owns a category — so a rapid-fire coding question goes to an
+ * engineer rather than the HR manager.
+ */
+const ASKER_FALLBACK: Partial<Record<Category, Category[]>> = {
+  "rapid-fire": ["coding", "aerodynamics", "propulsion", "controls", "quant", "system-design"],
+  coding: ["system-design", "ml-ai", "controls"],
+  "system-design": ["coding", "ml-ai"],
+  "ml-ai": ["data-science", "coding", "research"],
+  "data-science": ["ml-ai", "quant"],
+  quant: ["case-study", "data-science", "coding"],
+  "case-study": ["quant", "product"],
+  product: ["case-study", "behavioral"],
+  research: ["aerodynamics", "cfd", "ml-ai", "project"],
+  cfd: ["aerodynamics", "thermal"],
+  aerodynamics: ["cfd", "flight-mechanics"],
+  thermal: ["propulsion", "cfd"],
+  propulsion: ["thermal", "aerodynamics"],
+  structures: ["aerodynamics", "project"],
+  "flight-mechanics": ["controls", "aerodynamics"],
+  controls: ["flight-mechanics", "coding"],
+  resume: ["behavioral", "hr", "project"],
+  project: ["behavioral", "research"],
+  behavioral: ["hr", "project"],
+  hr: ["behavioral"],
+};
+
+/**
+ * Choose who asks a question. Technical questions must not land on an
+ * HR/recruiting panelist — an HR manager asking about binary search
+ * immediately breaks the illusion.
+ */
 function pickInterviewer(panel: Interviewer[], category: Category, excludeId?: string): Interviewer {
-  const owners = panel.filter((p) => p.focus.includes(category) && p.id !== excludeId);
+  const available = panel.filter((p) => p.id !== excludeId);
+  if (!available.length) return panel[0];
+
+  const isPeopleTopic = PEOPLE_CATEGORIES.includes(category);
+  // Someone whose focus is purely people-facing shouldn't ask technical questions.
+  const credible = isPeopleTopic
+    ? available
+    : available.filter((p) => !p.focus.every((f) => PEOPLE_CATEGORIES.includes(f)));
+  const pool = credible.length ? credible : available;
+
+  const owners = pool.filter((p) => p.focus.includes(category));
   if (owners.length) return pick(owners);
-  const others = panel.filter((p) => p.id !== excludeId);
-  return others.length ? pick(others) : panel[0];
+
+  for (const alt of ASKER_FALLBACK[category] ?? []) {
+    const near = pool.filter((p) => p.focus.includes(alt));
+    if (near.length) return pick(near);
+  }
+  return pick(pool);
 }
 
 function pick<T>(arr: T[]): T {
