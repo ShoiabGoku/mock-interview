@@ -39,8 +39,12 @@ export default function InterviewRoom() {
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { listening, interim, start: startRec, stop: stopRec, supported: sttSupported } =
-    useSpeechRecognition((text) => setInput((prev) => (prev ? prev + " " : "") + text));
+  // Each finalized phrase streams straight into the answer box, so a long
+  // spoken answer accumulates instead of being cut off at the first pause.
+  const { listening, interim, error: sttError, start: startRec, stop: stopRec, supported: sttSupported } =
+    useSpeechRecognition((text) =>
+      setInput((prev) => (prev ? prev.replace(/\s+$/, "") + " " : "") + text)
+    );
 
   // ---- init engine + opening line ----
   useEffect(() => {
@@ -237,7 +241,13 @@ export default function InterviewRoom() {
         {/* Input */}
         {phase !== "ended" && (
           <div className="glass border-t p-3">
-            {listening && <p className="mb-2 text-xs text-accent">🎙️ Listening… {interim && <span className="italic text-muted">{interim}</span>}</p>}
+            {listening && (
+              <p className="mb-2 text-xs text-accent">
+                🎙️ Listening — keep talking, pauses are fine. Click the mic again when you&apos;re done.
+                {interim && <span className="ml-1 italic text-muted">{interim}</span>}
+              </p>
+            )}
+            {sttError && <p className="mb-2 text-xs text-danger">{sttError}</p>}
             <div className="flex items-end gap-2">
               <textarea
                 value={input}

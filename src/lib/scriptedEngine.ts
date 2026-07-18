@@ -14,6 +14,7 @@ import { buildQuestionSet } from "@/data/questionBank";
 import { categoriesFor } from "@/data/roles";
 import { modeById, questionCountFor } from "@/data/modes";
 import { answerQuality, avg, scoreAnswer } from "./scoring";
+import { bandFor, closer, interruption, opener, reactionTo, transition } from "./dialogue";
 import { RESOURCES } from "@/data/resources";
 
 /**
@@ -30,6 +31,8 @@ export interface PlannedItem {
   interviewer: Interviewer;
   /** Follow-ups already asked for this question. */
   followUpsAsked: number;
+  /** Times the panel pushed back on a one-line answer. */
+  retries: number;
 }
 
 export interface EnginePlan {
@@ -43,33 +46,6 @@ export interface NextLine {
   /** True once the whole interview is over. */
   done: boolean;
 }
-
-const OPENERS: Record<Difficulty, string> = {
-  beginner: "Thanks for joining — take your time, there are no trick questions today. Let's start.",
-  intermediate: "Good to meet you. We'll cover a few areas; think out loud as you go. Let's begin.",
-  advanced: "Let's get straight into it — I'll push on your answers, so be ready to defend them.",
-  senior: "We're evaluating judgment as much as knowledge today. Let's dig in.",
-  principal: "These will be open-ended and ambiguous on purpose. Structure your thinking as you go.",
-  "research-scientist": "I'll expect first-principles reasoning and I'll challenge every claim. Shall we start?",
-};
-
-const ACK_STRONG = [
-  "That's a solid answer.",
-  "Good — you clearly know this.",
-  "I like how you framed that.",
-  "Right, that's exactly the direction.",
-];
-const ACK_OK = [
-  "Okay, that's partially there.",
-  "Alright — you're on the right track.",
-  "Reasonable, though I'd want more.",
-];
-const ACK_WEAK = [
-  "Hmm, I'm not fully convinced.",
-  "Let me push on that a bit.",
-  "That's a bit thin — let's dig deeper.",
-  "I don't think that's quite right.",
-];
 
 export class ScriptedEngine {
   plan: EnginePlan;
@@ -94,6 +70,7 @@ export class ScriptedEngine {
         bankQ,
         interviewer: pickInterviewer(company.panel, bankQ.category),
         followUpsAsked: 0,
+        retries: 0,
       })),
     };
   }
@@ -109,11 +86,10 @@ export class ScriptedEngine {
   start(): NextLine {
     this.started = true;
     const first = this.plan.items[0];
-    const lead = this.company.panel[this.company.panel.findIndex((p) => p.id === first.interviewer.id)] ?? this.company.panel[0];
-    const opener = OPENERS[this.config.difficulty];
+    const lead = first.interviewer;
     return {
       interviewer: lead,
-      text: `${opener} ${lead.name} here, ${lead.role}. ${first.bankQ.question}`,
+      text: opener(lead, this.config.difficulty, this.company.name, first.bankQ.question),
       interruption: false,
       done: false,
     };
@@ -150,43 +126,52 @@ export class ScriptedEngine {
     const hardMode = ["advanced", "senior", "principal", "research-scientist"].includes(this.config.difficulty);
     const followUpBudget = hardMode ? 2 : 1;
 
-    // Decide: ask a follow-up (weak answer or budget remaining on a good one), or move on.
+    // How the interviewer reacts to what was actually said.
+    const { text: reaction, band } = reactionTo(raw, quality, item.interviewer, this.config.difficulty);
+
+    // A one-line answer gets pushed on rather than accepted — like a real panel.
+    if (band === "punt" && item.retries < 1) {
+      item.retries++;
+      return { interviewer: item.interviewer, text: reaction, interruption: false, done: false };
+    }
+
+    // Decide: ask a follow-up, or move on.
     const wantFollowUp =
       item.followUpsAsked < followUpBudget &&
       item.bankQ.followUps.length > item.followUpsAsked &&
-      (quality < 0.6 || (hardMode && quality < 0.85 && item.followUpsAsked === 0));
-
-    const ack = quality > 0.7 ? pick(ACK_STRONG) : quality > 0.45 ? pick(ACK_OK) : pick(ACK_WEAK);
+      (quality < 0.62 || (hardMode && quality < 0.85 && item.followUpsAsked === 0));
 
     if (wantFollowUp) {
       const fu = item.bankQ.followUps[item.followUpsAsked];
       item.followUpsAsked++;
-      // ~30% chance a different panelist interrupts with the follow-up.
-      const interrupt = Math.random() < 0.3;
+      // ~28% chance a different panelist cuts in with the follow-up.
+      const interrupt = Math.random() < 0.28;
       const speaker = interrupt
         ? pickInterviewer(this.company.panel, item.bankQ.category, item.interviewer.id)
         : item.interviewer;
-      const lead = interrupt ? `Sorry to jump in — ${speaker.name}. ${fu}` : `${ack} ${fu}`;
-      return { interviewer: speaker, text: lead, interruption: interrupt, done: false };
+      const text = interrupt ? interruption(speaker, fu) : `${reaction} ${fu}`;
+      return { interviewer: speaker, text, interruption: interrupt, done: false };
     }
 
     // Move to the next question (or finish).
     this.idx++;
     if (this.idx >= this.plan.items.length) {
-      const closer = this.company.panel.find((p) => p.style === "warm") ?? this.company.panel[0];
+      const closing = this.company.panel.find((p) => p.style === "warm") ?? item.interviewer;
       return {
-        interviewer: closer,
-        text: `${ack} That's all the time we have. Thanks — we'll be in touch. You can review your full report now.`,
+        interviewer: closing,
+        text: `${reaction} ${closer(band, this.company.name)}`,
         interruption: false,
         done: true,
       };
     }
     const next = this.plan.items[this.idx];
-    const changingPanelist = next.interviewer.id !== item.interviewer.id;
-    const handoff = changingPanelist
-      ? `${ack} Let me hand over. ${next.interviewer.name} here, ${next.interviewer.role}. ${next.bankQ.question}`
-      : `${ack} Let's move on. ${next.bankQ.question}`;
-    return { interviewer: next.interviewer, text: handoff, interruption: false, done: false };
+    const sameInterviewer = next.interviewer.id === item.interviewer.id;
+    return {
+      interviewer: next.interviewer,
+      text: `${reaction} ${transition(sameInterviewer, next.interviewer, next.bankQ.question)}`,
+      interruption: false,
+      done: false,
+    };
   }
 
   /** The current bank question (for the report and hints). */
@@ -199,9 +184,17 @@ export class ScriptedEngine {
     const notes: Record<string, string> = {};
     if (!this.lastRaw) return notes;
     const item = this.plan.items[Math.min(this.idx, this.plan.items.length - 1)];
-    const q = answerQuality(this.lastRaw);
+    const raw = this.lastRaw;
+    const q = answerQuality(raw);
+    const covered = Math.round(raw.coverage * 100);
     notes[item.interviewer.id] =
-      q > 0.7 ? "Strong — noting depth." : q > 0.45 ? "Adequate; probing further." : "Gaps here; flagged.";
+      q > 0.7
+        ? `Strong — hit ${covered}% of key points.`
+        : q > 0.45
+        ? `Partial (${covered}%); probing further.`
+        : raw.missing.length
+        ? `Gap: ${raw.missing[0]}.`
+        : "Thin answer; flagged.";
     return notes;
   }
 
@@ -266,7 +259,7 @@ export class ScriptedEngine {
         weaknesses,
         missingConcepts: e?.missing.slice(0, 5) ?? [],
         betterAnswer: betterAnswerHint(it.bankQ),
-        confidence: e ? Math.round(answerQuality({ ...e, matched: [], missing: e.missing }) * 10) : 4,
+        confidence: e ? Math.round(answerQuality(e) * 10) : 4,
       };
     });
 

@@ -11,15 +11,20 @@ interface SpeechRecognitionEventLike {
   resultIndex: number;
   results: { length: number; [i: number]: SpeechRecognitionResultLike };
 }
+interface SpeechRecognitionErrorLike {
+  error?: string;
+}
 interface SpeechRecognitionLike {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  maxAlternatives?: number;
   onresult: ((e: SpeechRecognitionEventLike) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((e: SpeechRecognitionErrorLike) => void) | null;
   start: () => void;
   stop: () => void;
+  abort?: () => void;
 }
 
 function getRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
@@ -36,54 +41,122 @@ export function speechSupported(): boolean {
 }
 
 /**
- * Speech-to-text hook. Returns the live transcript and start/stop controls.
- * onFinal fires with the accumulated final transcript when the user stops.
+ * Speech-to-text for long answers.
+ *
+ * Chrome ends a recognition session on its own after a short silence, which
+ * previously truncated answers: the first pause ended dictation and everything
+ * after it was lost. Here the session is treated as a *continuous* dictation —
+ * when the browser ends it we transparently start a new one, and we only stop
+ * for real when the user asks us to (or permission is denied).
+ *
+ * Finalized phrases are streamed to `onSegment` as they are recognized so the
+ * answer box fills live rather than all at once at the end.
  */
-export function useSpeechRecognition(onFinal?: (text: string) => void) {
+export function useSpeechRecognition(onSegment?: (text: string) => void) {
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
   const recRef = useRef<SpeechRecognitionLike | null>(null);
-  const finalRef = useRef("");
+  const shouldListenRef = useRef(false);
+  const onSegmentRef = useRef(onSegment);
+  onSegmentRef.current = onSegment;
 
-  const stop = useCallback(() => {
-    recRef.current?.stop();
-  }, []);
-
-  const start = useCallback(() => {
+  const spawn = useCallback(() => {
     const Ctor = getRecognitionCtor();
     if (!Ctor) return;
     const rec = new Ctor();
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = "en-US";
-    finalRef.current = "";
+    rec.maxAlternatives = 1;
+
     rec.onresult = (e) => {
       let interimText = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
-        if (r.isFinal) finalRef.current += r[0].transcript + " ";
-        else interimText += r[0].transcript;
+        const chunk = r[0]?.transcript ?? "";
+        if (r.isFinal) {
+          const t = chunk.trim();
+          if (t) onSegmentRef.current?.(t);
+        } else {
+          interimText += chunk;
+        }
       }
       setInterim(interimText);
     };
-    rec.onend = () => {
-      setListening(false);
-      setInterim("");
-      const finalText = finalRef.current.trim();
-      if (finalText && onFinal) onFinal(finalText);
+
+    rec.onerror = (e) => {
+      const kind = e?.error ?? "";
+      // Silence and transient aborts are normal during a long answer — onend
+      // will respawn. Permission/hardware errors are terminal.
+      if (kind === "not-allowed" || kind === "service-not-allowed") {
+        shouldListenRef.current = false;
+        setError("Microphone permission denied. Allow mic access to answer by voice.");
+      } else if (kind === "audio-capture") {
+        shouldListenRef.current = false;
+        setError("No microphone found.");
+      }
     };
-    rec.onerror = () => setListening(false);
+
+    rec.onend = () => {
+      setInterim("");
+      if (shouldListenRef.current) {
+        // Browser stopped on silence — keep dictation alive.
+        setTimeout(() => {
+          if (!shouldListenRef.current) return;
+          try {
+            spawn();
+          } catch {
+            /* a start is already in flight; ignore */
+          }
+        }, 150);
+      } else {
+        setListening(false);
+      }
+    };
+
     recRef.current = rec;
+    try {
+      rec.start();
+    } catch {
+      /* start() throws if one is already running; safe to ignore */
+    }
+  }, []);
+
+  const start = useCallback(() => {
+    if (shouldListenRef.current) return;
+    setError(null);
+    shouldListenRef.current = true;
     setListening(true);
-    rec.start();
-  }, [onFinal]);
+    spawn();
+  }, [spawn]);
 
-  useEffect(() => () => recRef.current?.stop(), []);
+  const stop = useCallback(() => {
+    shouldListenRef.current = false;
+    setInterim("");
+    setListening(false);
+    try {
+      recRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
-  return { listening, interim, start, stop, supported: speechSupported() };
+  useEffect(
+    () => () => {
+      shouldListenRef.current = false;
+      try {
+        recRef.current?.abort?.() ?? recRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+    },
+    []
+  );
+
+  return { listening, interim, error, start, stop, supported: speechSupported() };
 }
-
-let currentUtterance: SpeechSynthesisUtterance | null = null;
 
 /** Speak text via the Web Speech API. Best-effort; silent if unsupported. */
 export function speak(text: string, onEnd?: () => void, voiceHint?: "female" | "male") {
@@ -105,13 +178,11 @@ export function speak(text: string, onEnd?: () => void, voiceHint?: "female" | "
     if (match) u.voice = match;
   }
   u.onend = () => onEnd?.();
-  currentUtterance = u;
   window.speechSynthesis.speak(u);
 }
 
 export function stopSpeaking() {
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
-    currentUtterance = null;
   }
 }
