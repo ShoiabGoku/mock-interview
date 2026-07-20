@@ -31,6 +31,79 @@ export function isUnsure(answer: string): boolean {
   ].some((p) => t.includes(p));
 }
 
+/**
+ * Detect a candidate asking about the QUESTION rather than answering it —
+ * "I didn't understand", "what do you mean?", "who is the other person?".
+ *
+ * Distinct from isUnsure(): that is "I don't know the answer", this is "I
+ * don't know what you're asking". Conceding knowledge earns a steer and a
+ * move on; asking for clarification must earn an actual clarification, or
+ * the panel talks straight past the candidate.
+ */
+export function isConfused(answer: string): boolean {
+  const t = answer.toLowerCase().replace(/[’']/g, "").trim();
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length > 25) return false; // a long reply is an attempt, not a query
+
+  const explicit = [
+    "didnt understand", "did not understand", "dont understand", "do not understand",
+    "what do you mean", "what does that mean", "not sure what you are asking",
+    "not sure what youre asking", "what are you asking", "can you repeat",
+    "could you repeat", "can you rephrase", "could you rephrase", "say that again",
+    "come again", "can you clarify", "could you clarify", "clarify the question",
+    "didnt get the question", "dont get the question", "which one do you mean",
+    "what exactly do you want", "what do you want me to say",
+  ];
+  if (explicit.some((p) => t.includes(p))) return true;
+
+  // A short interrogative aimed back at the panel ("Who is the other person?").
+  if (words.length <= 12 && /\?\s*$/.test(answer.trim())) {
+    return /^(who|what|which|where|when|how|why|can|could|do|does|are|is|sorry)\b/.test(t);
+  }
+  return false;
+}
+
+/** How to reframe an ask, by topic — says what KIND of answer is wanted, never the answer. */
+const FRAMING: Partial<Record<string, string>> = {
+  aerodynamics: "I'm after the physical picture and the reasoning, not a number.",
+  structures: "Talk me through the load path — what carries what.",
+  propulsion: "A qualitative walk-through of the process is fine.",
+  cfd: "I want your setup reasoning — assumptions, models, why.",
+  thermal: "Describe the mechanism and what balances what.",
+  "flight-mechanics": "Reason it out from the forces involved.",
+  controls: "Tell me what the system does and why it behaves that way.",
+  coding: "Talk me through your approach before any code.",
+  "system-design": "Start from the requirements and work outward.",
+  "ml-ai": "Explain the intuition first, the maths second.",
+  "data-science": "Tell me how you'd approach it and what you'd check.",
+  quant: "Set up the problem out loud — I care about the reasoning.",
+  "case-study": "Structure it however you like; just think out loud.",
+  behavioral: "A specific situation from your own experience is what I'm after.",
+  hr: "Just tell me honestly, in your own words.",
+  resume: "Anything from your own CV — pick one and talk me through it.",
+  project: "Pick a project of yours and walk me through your part in it.",
+  research: "Your own reasoning matters more than the literature here.",
+};
+
+/**
+ * Answer a request for clarification: acknowledge, reframe what's being
+ * asked, and put the SAME question again. Never moves on, never leaks.
+ */
+export function clarify(question: string, category: string, asked: number): string {
+  const ack = pickFresh([
+    "Sure, let me put that another way.",
+    "Fair enough — let me rephrase.",
+    "No problem, I'll re-frame it.",
+    "Of course. Let me be clearer.",
+  ]);
+  const frame = FRAMING[category] ?? "Just talk me through how you'd think about it.";
+  // If they're still lost after one rephrase, strip it right back.
+  if (asked >= 1) {
+    return `${ack} Forget the phrasing for a moment — ${frame} Take it slowly: ${question}`;
+  }
+  return `${ack} ${frame} So: ${question}`;
+}
+
 export function bandFor(quality: number, raw: RawScore, answer: string): Band {
   if (isUnsure(answer)) return "unsure";
   if (raw.words < 6) return "punt";
@@ -68,6 +141,16 @@ export function pretty(keyword: string): string {
     floyd: "Floyd's cycle detection",
     biot: "the Biot number",
     oswald: "the Oswald factor",
+    "l/d": "the L/D ratio",
+    "t/c": "thickness-to-chord",
+    "w/s": "wing loading",
+    "y plus": "y-plus",
+    "k-omega": "the k-ω model",
+    "k omega": "the k-ω model",
+    rans: "RANS",
+    sst: "the SST model",
+    "2am": "the enclosed-area term",
+    "t/2am": "the Bredt–Batho relation",
   };
   return map[keyword.toLowerCase()] ?? keyword;
 }
@@ -224,6 +307,17 @@ const EXPAND = [
   "Walk me through the reasoning, not just the result.",
 ];
 
+/**
+ * Verdicts used when the panel is about to change topic. These CLOSE the
+ * question instead of opening a new thread — see the willWait note below.
+ */
+const CLOSING_VERDICT = [
+  "There was more to that one, but let's keep moving.",
+  "I'd have wanted a bit more there.",
+  "Okay — I've got what I need on that.",
+  "We'll leave it there.",
+];
+
 export interface Reaction {
   text: string;
   band: Band;
@@ -233,7 +327,13 @@ export interface Reaction {
 
 /**
  * The interviewer's reaction to an answer, before the next question.
- * `unsureAlready` is true if they've already said they don't know on this one.
+ *
+ * `willWait` says whether the panel is about to pause for a reply. It must be
+ * false whenever the caller will append a different question, because an open
+ * probe ("what else is going on?") glued to a topic change reads as the panel
+ * asking something and abandoning it mid-breath — the single most artificial
+ * thing the offline engine used to do. When we aren't waiting, the reaction
+ * closes the question instead of opening a thread.
  */
 export function reactionTo(
   raw: RawScore,
@@ -241,10 +341,17 @@ export function reactionTo(
   interviewer: Interviewer,
   difficulty: Difficulty,
   answer: string,
-  unsureAlready: boolean
+  unsureAlready: boolean,
+  willWait: boolean
 ): Reaction {
   const band = bandFor(quality, raw, answer);
-  const open = pickFresh(REACT[interviewer.style][band]);
+  // Several reaction openers are themselves questions ("Let's back up — what's
+  // actually happening physically?"). When nobody is waiting for a reply those
+  // dangle exactly like a gap probe does, so the pool is narrowed to lines
+  // that close rather than open.
+  const allOpeners = REACT[interviewer.style][band];
+  const closing = allOpeners.filter((l) => !l.includes("?"));
+  const open = pickFresh(willWait || !closing.length ? allOpeners : closing);
 
   // "I don't know" — acknowledge, offer one steer, then let it go.
   if (band === "unsure") {
@@ -263,14 +370,31 @@ export function reactionTo(
   const credit = band === "strong" || band === "ok" ? creditLine(raw) : null;
   if (credit && Math.random() < 0.7) parts.push(credit);
 
-  const probe = gapProbe(band);
-  if (probe && band !== "strong") parts.push(probe);
-  else if (probe) parts.push(probe);
-
-  const hard = ["senior", "principal", "research-scientist"].includes(difficulty);
-  if (hard && band === "weak" && Math.random() < 0.3) parts.push(pick(PRESSURE));
+  // Only open a thread if someone is going to wait for the answer.
+  if (willWait) {
+    const probe = gapProbe(band);
+    if (probe) parts.push(probe);
+    const hard = ["senior", "principal", "research-scientist"].includes(difficulty);
+    if (hard && band === "weak" && Math.random() < 0.3) parts.push(pick(PRESSURE));
+  } else if (band === "weak" && Math.random() < 0.3) {
+    // Kept occasional — the caller usually adds a bridge and a handoff after
+    // this, and three stacked clauses reads as padding.
+    parts.push(follow(parts[parts.length - 1], CLOSING_VERDICT));
+  }
 
   return { text: parts.join(" "), band, retry: false };
+}
+
+/**
+ * Bridge into the next question by referencing what the candidate actually
+ * said. Without this the panel visibly ignores the answer it just heard.
+ */
+export function bridge(concept: string | null, sameTopic: boolean): string | null {
+  if (!concept) return null;
+  const c = pretty(concept);
+  return sameTopic
+    ? pick([`Staying with that — you brought up ${c}.`, `Let's stay on ${c} for a moment.`])
+    : pick([`You mentioned ${c} — I want to come at this from another angle.`, `Picking up from ${c}.`]);
 }
 
 /** Handing over to the next question, in this interviewer's voice. */

@@ -14,7 +14,7 @@ import { buildQuestionSet } from "@/data/questionBank";
 import { categoriesFor } from "@/data/roles";
 import { modeById, questionCountFor } from "@/data/modes";
 import { answerQuality, avg, scoreAnswer } from "./scoring";
-import { bandFor, closer, interruption, opener, reactionTo, transition } from "./dialogue";
+import { bandFor, bridge, clarify, closer, interruption, isConfused, opener, reactionTo, transition } from "./dialogue";
 import { RESOURCES } from "@/data/resources";
 
 /**
@@ -35,6 +35,8 @@ export interface PlannedItem {
   retries: number;
   /** Times the candidate said they don't know this one. */
   unsureCount: number;
+  /** Times they asked for the question to be clarified. */
+  clarifyCount: number;
 }
 
 export interface EnginePlan {
@@ -74,6 +76,7 @@ export class ScriptedEngine {
         followUpsAsked: 0,
         retries: 0,
         unsureCount: 0,
+        clarifyCount: 0,
       })),
     };
   }
@@ -104,6 +107,20 @@ export class ScriptedEngine {
    */
   submitAnswer(answer: string): NextLine {
     const item = this.plan.items[this.idx];
+
+    // The candidate is asking about the question, not answering it. Rephrase
+    // and wait — scoring this as a bad answer and changing topic is how the
+    // panel ends up talking straight past someone who is simply lost.
+    if (isConfused(answer) && item.clarifyCount < 2) {
+      item.clarifyCount++;
+      return {
+        interviewer: item.interviewer,
+        text: clarify(item.bankQ.question, item.bankQ.category, item.clarifyCount - 1),
+        interruption: false,
+        done: false,
+      };
+    }
+
     const raw = scoreAnswer(answer, item.bankQ);
     this.lastRaw = raw;
     const quality = answerQuality(raw);
@@ -129,14 +146,27 @@ export class ScriptedEngine {
     const hardMode = ["advanced", "senior", "principal", "research-scientist"].includes(this.config.difficulty);
     const followUpBudget = hardMode ? 2 : 1;
 
-    // How the interviewer reacts to what was actually said.
+    // Decide the SHAPE of this turn before writing any words, so the reaction
+    // can be told whether anyone is going to wait for a reply. Generating an
+    // open probe and then appending a different question is what made the
+    // panel look like it was reading from a script.
+    const provisional = bandFor(quality, raw, answer);
+    const wantFollowUp =
+      provisional !== "unsure" &&
+      item.followUpsAsked < followUpBudget &&
+      item.bankQ.followUps.length > item.followUpsAsked &&
+      (quality < 0.62 || (hardMode && quality < 0.85 && item.followUpsAsked === 0));
+    const mayRetry = provisional === "unsure" || provisional === "punt";
+    const willWait = wantFollowUp || (mayRetry && item.retries < 1);
+
     const { text: reaction, band, retry } = reactionTo(
       raw,
       quality,
       item.interviewer,
       this.config.difficulty,
       answer,
-      item.unsureCount > 0
+      item.unsureCount > 0,
+      willWait
     );
     if (band === "unsure") item.unsureCount++;
 
@@ -146,14 +176,6 @@ export class ScriptedEngine {
       item.retries++;
       return { interviewer: item.interviewer, text: reaction, interruption: false, done: false };
     }
-
-    // Never grill someone with follow-ups on a question they've said they
-    // don't know — move the interview along instead.
-    const wantFollowUp =
-      band !== "unsure" &&
-      item.followUpsAsked < followUpBudget &&
-      item.bankQ.followUps.length > item.followUpsAsked &&
-      (quality < 0.62 || (hardMode && quality < 0.85 && item.followUpsAsked === 0));
 
     if (wantFollowUp) {
       const fu = item.bankQ.followUps[item.followUpsAsked];
@@ -178,14 +200,68 @@ export class ScriptedEngine {
         done: true,
       };
     }
+
+    // Let what they just said steer where we go next, so the interview reads
+    // as a thread rather than a fixed list being read out in order.
+    this.promoteRelevant(answer, raw.matched);
+
     const next = this.plan.items[this.idx];
     const sameInterviewer = next.interviewer.id === item.interviewer.id;
+    const link =
+      raw.matched.length && Math.random() < 0.55
+        ? bridge(raw.matched[0], next.bankQ.category === item.bankQ.category)
+        : null;
+    const parts = [reaction, link, transition(sameInterviewer, next.interviewer, next.bankQ.question)];
     return {
       interviewer: next.interviewer,
-      text: `${reaction} ${transition(sameInterviewer, next.interviewer, next.bankQ.question)}`,
+      text: parts.filter(Boolean).join(" "),
       interruption: false,
       done: false,
     };
+  }
+
+  /**
+   * Reorder the remaining questions so the next one connects to what the
+   * candidate actually talked about. The plan is fixed up front, but the
+   * ORDER doesn't have to be — following the thread is most of what makes an
+   * interviewer feel like they were listening.
+   */
+  private promoteRelevant(answer: string, matched: string[]): void {
+    const rest = this.plan.items.slice(this.idx);
+    if (rest.length < 2) return;
+
+    const vocab = new Set(
+      `${answer} ${matched.join(" ")}`
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 4)
+    );
+    if (!vocab.size) return;
+
+    const relevance = (it: PlannedItem): number => {
+      const terms = [...it.bankQ.keywords, it.bankQ.question]
+        .join(" ")
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 4);
+      if (!terms.length) return 0;
+      return terms.filter((t) => vocab.has(t)).length / Math.sqrt(terms.length);
+    };
+
+    let bestI = 0;
+    let best = relevance(rest[0]);
+    for (let i = 1; i < rest.length; i++) {
+      const r = relevance(rest[i]);
+      if (r > best) { best = r; bestI = i; }
+    }
+    // Only reorder on a real connection — otherwise keep the planned order.
+    if (bestI > 0 && best > 0.35) {
+      const [chosen] = rest.splice(bestI, 1);
+      rest.unshift(chosen);
+      this.plan.items = [...this.plan.items.slice(0, this.idx), ...rest];
+    }
   }
 
   /** The current bank question (for the report and hints). */
