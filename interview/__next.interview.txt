@@ -2,4 +2,4 @@
 2:I[39756,["/mock-interview/_next/static/chunks/3_-qsqk35izmu.js","/mock-interview/_next/static/chunks/1-8s9_t85wwr4.js","/mock-interview/_next/static/chunks/0dkuzji39odti.js"],"default"]
 3:I[37457,["/mock-interview/_next/static/chunks/3_-qsqk35izmu.js","/mock-interview/_next/static/chunks/1-8s9_t85wwr4.js","/mock-interview/_next/static/chunks/0dkuzji39odti.js"],"default"]
 4:[]
-0:{"rsc":["$","$1","c",{"children":[null,["$","$L2",null,{"parallelRouterKey":"children","template":["$","$L3",null,{}]}]]}],"isPartial":false,"staleTime":300,"varyParams":"$W4","buildId":"4RDJofNle4HW9jwvMhno5"}
+0:{"rsc":["$","$1","c",{"children":[null,["$","$L2",null,{"parallelRouterKey":"children","template":["$","$L3",null,{}]}]]}],"isPartial":false,"staleTime":300,"varyParams":"$W4","buildId":"MoRcnIqgcW1Ss93JpuTHb"}
