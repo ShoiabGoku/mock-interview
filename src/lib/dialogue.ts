@@ -81,10 +81,41 @@ const pick = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
 const recent: string[] = [];
 const RECENT_MEMORY = 6;
 
+/**
+ * Fingerprint a line by its opening words. Two lines from different pools can
+ * share an opening without being equal — "That's fine, honestly." followed by
+ * "That's fine, let's move on." reads as a stutter even though the strings
+ * differ — so freshness is judged on the opening, not the whole sentence.
+ */
+function headWords(line: string): string {
+  return line
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" ");
+}
+
+/**
+ * Pick a continuation that doesn't echo the opening it will be appended to.
+ * These come from separate pools, so nothing else stops "That's fine, honestly."
+ * being followed by "That's fine, let's move on."
+ */
+function follow(open: string, options: string[]): string {
+  const head = headWords(open);
+  const ok = options.filter((o) => headWords(o) !== head);
+  return pick(ok.length ? ok : options);
+}
+
 /** Pick a phrase that hasn't been used in the last few turns, if possible. */
 function pickFresh(options: string[]): string {
-  const fresh = options.filter((o) => !recent.includes(o));
-  const choice = pick(fresh.length ? fresh : options);
+  const seen = new Set(recent.map(headWords));
+  const fresh = options.filter((o) => !recent.includes(o) && !seen.has(headWords(o)));
+  // Fall back to plain string-freshness, then to anything, so a small pool
+  // never deadlocks just because every option shares an opening.
+  const pool = fresh.length ? fresh : options.filter((o) => !recent.includes(o));
+  const choice = pick(pool.length ? pool : options);
   recent.push(choice);
   if (recent.length > RECENT_MEMORY) recent.shift();
   return choice;
@@ -218,14 +249,14 @@ export function reactionTo(
   // "I don't know" — acknowledge, offer one steer, then let it go.
   if (band === "unsure") {
     if (!unsureAlready) {
-      return { text: `${open} ${pick(STEERS)}`, band, retry: true };
+      return { text: `${open} ${follow(open, STEERS)}`, band, retry: true };
     }
-    return { text: `${open} ${pick(MOVE_ON)}`, band, retry: false };
+    return { text: `${open} ${follow(open, MOVE_ON)}`, band, retry: false };
   }
 
   // A one-liner that isn't an admission of ignorance — push for substance.
   if (band === "punt") {
-    return { text: `${open} ${pick(EXPAND)}`, band, retry: true };
+    return { text: `${open} ${follow(open, EXPAND)}`, band, retry: true };
   }
 
   const parts = [open];
