@@ -68,7 +68,7 @@ export class ScriptedEngine {
     const mode = modeById(config.mode);
     const cats = categoriesFor(role.focus, mode?.categories ?? null);
     const count = questionCountFor(config.durationMin);
-    const bank = buildQuestionSet(cats.length ? cats : (["behavioral"] as Category[]), count);
+    const bank = buildQuestionSet(cats.length ? cats : (["behavioral"] as Category[]), count, company.id);
     this.plan = {
       items: bank.map((bankQ) => ({
         bankQ,

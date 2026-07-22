@@ -16,8 +16,9 @@ const Q = (
   followUps: string[],
   keywords: string[],
   ideal: string,
-  difficulty: BankQuestion["difficulty"] = "medium"
-): BankQuestion => ({ id, category, question, followUps, keywords, ideal, difficulty });
+  difficulty: BankQuestion["difficulty"] = "medium",
+  companies?: string[]
+): BankQuestion => ({ id, category, question, followUps, keywords, ideal, difficulty, companies });
 
 export const QUESTION_BANK: BankQuestion[] = [
   // ---------------- Aerodynamics ----------------
@@ -1021,6 +1022,258 @@ export const QUESTION_BANK: BankQuestion[] = [
     ["max q", "dynamic pressure", "wind", "load relief", "angle of attack", "bending", "gimbal", "trade-off"],
     "At max-Q, aerodynamic loads from wind shear and angle of attack are largest and structural bending is critical. The controller trades trajectory tracking against structural load: load-relief logic lets the vehicle weathervane slightly into the relative wind, reducing angle of attack and bending moment at the cost of trajectory dispersion. You must also filter or gain-stabilize the flexible body bending modes so the TVC doesn't excite them.",
     "hard"),
+
+  // ==================================================================
+  //  COMPANY-TRUE QUESTIONS
+  //  Tagged to the panels that actually ask them (researched from
+  //  published IIT/IISc interview experiences + standard company loops).
+  //  Untagged questions above stay generic; these surface preferentially
+  //  when the interview's company matches.
+  // ==================================================================
+
+  // ---------------- ISRO / DRDO / HAL — project & fundamentals grilling ----------------
+  Q("isro-proj-1", "project",
+    "Take me through your M.Tech thesis. What was the actual problem, what did YOU do, and where did it fall short?",
+    ["Why did you choose that method over the alternatives?", "If you had six more months, what would you do differently?", "What was the one result you're least sure about?"],
+    ["problem statement", "my contribution", "method", "validation", "limitation", "result", "assumption"],
+    "ISRO/DRDO interviews live on your own project. Structure it: the concrete problem and why it matters, your specific contribution (not the group's), the method and why it beat alternatives, how you validated, and an honest limitation. They probe for depth and honesty — a candidate who oversells a result they can't defend loses more than one who names a real weakness.",
+    "medium", ["isro", "drdo", "hal"]),
+  Q("isro-why-1", "hr",
+    "You could earn far more in private industry or abroad. Why ISRO, and are you prepared for the pay scale and the bond?",
+    ["Where do you see yourself in ISRO in ten years?", "Are you willing to relocate to Sriharikota / Mahendragiri?", "How do you feel about the service bond?"],
+    ["mission", "national", "space", "long term", "relocate", "bond", "stability", "purpose"],
+    "They are screening for genuine motivation and staying power, because attrition to private industry is a real cost. A credible answer names the mission (national space capability, working on flight hardware you can't touch elsewhere), acknowledges the pay reality honestly rather than pretending it doesn't matter, and confirms willingness to relocate and honour the bond. Vague 'passion for space' without specifics reads as rehearsed.",
+    "easy", ["isro", "drdo", "hal"]),
+  Q("isro-fund-1", "propulsion",
+    "Why do most Indian launch vehicles use a solid strap-on booster stage? Walk me through the trade.",
+    ["Why cryogenic for the upper stage and not the first?", "What's the downside of solids you have to live with?", "How does specific impulse drive stage choice?"],
+    ["thrust", "solid", "cryogenic", "specific impulse", "throttle", "storable", "upper stage", "density"],
+    "Solids give very high thrust and thrust-to-weight cheaply and store indefinitely — ideal for lift-off where you fight gravity losses, so strap-ons boost initial acceleration. Their cost is no throttling/shutdown and lower Isp. Cryogenic (LH2/LOX) has the highest Isp, best where thrust matters less and efficiency dominates — the upper stage — but is hard to store and needs insulation, so it's poor for the booster. Stage choice follows Isp × where in the trajectory you spend it.",
+    "medium", ["isro", "drdo", "hal"]),
+  Q("isro-fund-2", "structures",
+    "A launch vehicle stage is essentially a thin pressurised shell in axial compression. What failure mode keeps you up at night, and how do you design against it?",
+    ["How does internal pressurisation help buckling?", "What's the knockdown factor about?", "Monocoque vs semi-monocoque here?"],
+    ["buckling", "shell", "axial compression", "knockdown", "pressure stabilised", "stiffener", "imperfection"],
+    "Shell buckling under axial compression — and real shells buckle far below the classical prediction because of imperfections, hence empirical knockdown factors. You design against it with stiffeners (stringers/frames → semi-monocoque), by pressure-stabilising the tank so internal pressure adds tensile stress that raises the buckling load, and by tight manufacturing tolerances. It's an imperfection-sensitive, not strength-limited, problem.",
+    "hard", ["isro", "drdo", "hal", "spacex"]),
+  Q("drdo-1", "controls",
+    "For a tactical missile, why might you accept a statically UNSTABLE airframe on purpose?",
+    ["What does that demand of the autopilot?", "How does CG travel during flight affect this?", "What's the manoeuvrability payoff?"],
+    ["unstable", "manoeuvrability", "agility", "autopilot", "cg", "static margin", "response"],
+    "A statically unstable airframe (CG behind the aerodynamic centre) is far more agile — small control deflections produce large, fast attitude changes, which you want for intercept. The price is that it will diverge without continuous active stabilisation, so the autopilot must be fast and reliable, and you must track CG travel as propellant burns since it shifts the static margin. It's the missile analogue of a relaxed-stability fighter.",
+    "hard", ["drdo"]),
+  Q("hal-1", "structures",
+    "In a metal aircraft wing, why is the lower skin usually a different alloy from the upper skin?",
+    ["Which loads does each surface see in positive-g flight?", "Why does fatigue dominate the lower skin?", "What's damage tolerance?"],
+    ["compression", "tension", "fatigue", "damage tolerance", "7075", "2024", "upper", "lower"],
+    "In positive-g flight the upper skin is in compression (buckling/strength-critical → a higher-strength alloy like 7075) and the lower skin cycles in tension every flight (fatigue and crack-growth critical → a tougher, more damage-tolerant alloy like 2024). You match the alloy's strong property to the load case: strength up top, toughness and fatigue life below.",
+    "medium", ["hal", "airbus", "boeing"]),
+
+  // ---------------- SpaceX / Blue Origin — first principles & intensity ----------------
+  Q("spacex-1", "propulsion",
+    "Estimate, from first principles, the exhaust velocity you'd get from a LOX/methane engine. Don't quote a number — derive the scaling.",
+    ["What sets the practical ceiling on Isp?", "Why methane over RP-1 for reuse?", "How does chamber pressure enter?"],
+    ["first principles", "exhaust velocity", "molecular weight", "chamber temperature", "isp", "methane", "reuse", "coking"],
+    "Exhaust velocity scales like √(Tc/M) — hotter chamber and lighter exhaust molecules give more. LOX/methane burns hot with moderate molecular weight, so Isp sits between RP-1 and hydrogen. The practical ceiling is material/cooling limits on Tc and nozzle expansion. Methane wins for reuse because it burns cleanly (little coking vs RP-1), is denser than hydrogen (smaller tanks), and can be made on Mars. SpaceX wants the reasoning chain, not a memorised 380 s.",
+    "hard", ["spacex", "blueorigin"]),
+  Q("spacex-2", "hr",
+    "This role can mean 60–80 hour weeks under real schedule pressure. Why do you want that, and how do you sustain it?",
+    ["Tell me about a time you worked under brutal deadline.", "What burns you out, and how do you manage it?", "What makes the intensity worth it to you?"],
+    ["intensity", "mission", "ownership", "deadline", "sustainable", "prioritise", "resilience"],
+    "They're testing whether you understand and want the intensity, not just tolerate it. Be honest: connect the hours to the mission (flight hardware, fast iteration), give a concrete past example of delivering under pressure, and show self-awareness about sustainability — how you prioritise and recover — rather than claiming you never tire. Bravado ('I'll grind forever') reads as naïve; so does hedging.",
+    "medium", ["spacex", "blueorigin"]),
+
+  // ---------------- Airbus / Boeing — certification, fatigue, systems ----------------
+  Q("airbus-1", "structures",
+    "What does 'damage tolerance' mean in airframe certification, and how is it different from safe-life design?",
+    ["What inspection interval logic follows from it?", "Where would you still use safe-life?", "What's the role of crack growth rate?"],
+    ["damage tolerance", "safe life", "crack growth", "inspection", "residual strength", "fail safe", "fatigue"],
+    "Damage tolerance assumes cracks exist from day one and proves the structure retains adequate residual strength while a crack grows slowly and detectably between scheduled inspections — inspection intervals are set so a crack is found before it's critical. Safe-life instead retires the part after a fixed life with no assumed cracks, used where inspection is impossible (e.g. landing gear). Modern transport airframes are predominantly damage-tolerant/fail-safe.",
+    "hard", ["airbus", "boeing"]),
+  Q("airbus-2", "hr",
+    "Commercial aviation moves slowly and is heavily regulated. After a fast-paced project background, why does that appeal to you?",
+    ["How do you feel about certification timelines measured in years?", "What draws you to aviation specifically?", "Safety culture — what does it mean to you?"],
+    ["safety", "certification", "rigour", "regulation", "reliability", "long term", "discipline"],
+    "They want someone energised, not frustrated, by rigour. A good answer reframes the regulation as the point: you're drawn to engineering where getting it exactly right matters because lives depend on it, you respect the discipline of certification, and you find long-horizon reliability work satisfying rather than tedious. Naming safety culture concretely helps.",
+    "easy", ["airbus", "boeing"]),
+
+  // ---------------- GE Aerospace / Rolls-Royce — turbomachinery & thermal ----------------
+  Q("ge-1", "thermal",
+    "Turbine inlet temperatures now exceed the melting point of the blade alloy. How is that possible?",
+    ["How does film cooling actually work?", "What do thermal barrier coatings buy you?", "Why single-crystal blades?"],
+    ["film cooling", "thermal barrier coating", "single crystal", "internal cooling", "melting point", "creep", "gas temperature"],
+    "The metal never reaches the gas temperature: internal convective cooling (serpentine passages), film cooling (cool air bled through holes forms an insulating layer over the surface), and thermal barrier ceramic coatings drop the metal temperature hundreds of degrees below the gas. Single-crystal blades remove grain boundaries that fail by creep, allowing higher stress at temperature. Together these let gas temperature exceed the alloy melting point safely.",
+    "hard", ["ge-aero", "rolls-royce"]),
+  Q("ge-2", "propulsion",
+    "Why did engines move to very high bypass ratios, and what's the limit?",
+    ["How does bypass ratio affect propulsive efficiency?", "Why does fan diameter become a problem?", "What's a geared turbofan for?"],
+    ["bypass ratio", "propulsive efficiency", "fan", "specific fuel consumption", "nacelle drag", "geared", "tip speed"],
+    "Propulsive efficiency improves when you move more air more slowly for the same thrust, so high bypass lowers SFC. The limit is the fan: a bigger fan means more nacelle weight/drag and the fan tip goes supersonic if it spins at the core's speed. Geared turbofans decouple fan and low-pressure turbine speeds so the fan can turn slowly and large while the turbine stays efficient — pushing the practical bypass ratio higher.",
+    "medium", ["ge-aero", "rolls-royce"]),
+
+  // ---------------- Quant — Goldman / JPMorgan — probability & brainteasers ----------------
+  Q("gs-prob-1", "quant",
+    "You flip a fair coin repeatedly. What's the expected number of flips to get two heads in a row?",
+    ["Now do three heads in a row.", "Set it up as a Markov chain.", "What about HT instead of HH — is it different?"],
+    ["expectation", "markov", "states", "recurrence", "6", "conditioning", "self-consistent"],
+    "Condition on states. Let E = expected flips from scratch, E1 = expected having just seen one head. E = 1 + ½E1 + ½E (tails resets). E1 = 1 + ½·0 + ½E. Solving: E1 = 1 + ½E, E = 1 + ½(1+½E) + ½E ⇒ E = 6. The method — define states, write self-consistent expectation equations, solve — matters more than the 6, and generalises to any pattern (HT gives 4, which surprises people).",
+    "medium", ["goldman", "jpmorgan"]),
+  Q("gs-prob-2", "quant",
+    "A stick of length 1 is broken at two uniformly random points. What's the probability the three pieces form a triangle?",
+    ["What condition must the pieces satisfy?", "How do you set this up geometrically?", "What if you break sequentially instead?"],
+    ["triangle inequality", "1/4", "uniform", "geometric probability", "unit square", "no piece exceeds half"],
+    "Triangle forms iff no piece exceeds ½. With break points x,y uniform on [0,1], map to the unit square and the feasible region is the set where all three pieces < ½; its area is ¼. So probability = 1/4. The interviewer watches you translate 'triangle inequality' into 'no piece > ½' and then into a geometric-probability area — think out loud, that's what's scored.",
+    "hard", ["goldman", "jpmorgan"]),
+  Q("gs-prob-3", "quant",
+    "Two players alternate rolling a fair die; first to roll a 6 wins. What's the probability the first player wins?",
+    ["Why isn't it just 1/2?", "Generalise to probability p of success per turn.", "What's the expected number of rolls?"],
+    ["geometric series", "6/11", "first mover", "conditioning", "p/(1-(1-p))", "advantage"],
+    "First player wins on roll 1, 3, 5, … : P = (1/6) + (5/6)²(1/6) + … = (1/6)/(1−(5/6)²) = (1/6)/(11/36) = 6/11. The first mover has an edge (>½) because they get the first shot each round. General form for per-turn success p: P(first) = 1/(2−p). Setting it up as a geometric series or a one-step recursion both work.",
+    "medium", ["goldman", "jpmorgan"]),
+
+  // ---------------- Consulting — McKinsey / BCG / Bain — cases ----------------
+  Q("mck-case-1", "case-study",
+    "How many commercial aircraft take off in India on a typical day? Walk me through your estimate.",
+    ["What's the biggest assumption you'd sanity-check?", "How would you validate this against a known number?", "What would change this in five years?"],
+    ["market sizing", "assumptions", "top down", "bottom up", "airports", "sanity check", "structure"],
+    "They don't want the number — they want structure and sane assumptions. Bottom-up: major airports (~a few dozen with meaningful traffic) × flights per airport per day, or top-down from passengers/year ÷ seats ÷ load factor ÷ 365. State each assumption, keep round numbers, then sanity-check against something you know (a known busy airport's daily movements). Land on a range and explain what you'd verify first.",
+    "medium", ["mckinsey", "bcg", "bain"]),
+  Q("mck-case-2", "case-study",
+    "A profitable airline's margins have fallen three years running while revenue grew. Where do you look first?",
+    ["Structure the profit drivers.", "How do you separate price, volume, and cost effects?", "What data would you request on day one?"],
+    ["profitability", "revenue", "cost", "structure", "price volume mix", "fixed variable", "hypothesis"],
+    "Profit = revenue − cost, so decompose both. Revenue up but margin down means costs rose faster or mix shifted — break revenue into price × volume × route mix, and cost into fuel, labour, fleet/lease (fixed vs variable). Form a hypothesis (e.g. fuel and low-yield route expansion) and request the data to test it. Consulting scores the MECE structure and the hypothesis-driven narrowing, not a guessed answer.",
+    "hard", ["mckinsey", "bcg", "bain"]),
+
+  // ---------------- SDE — Google / Microsoft / Amazon ----------------
+  Q("goog-dsa-1", "coding",
+    "Given a stream of numbers, design a way to return the median at any point. Talk me through the approach before any code.",
+    ["Why two heaps?", "What are the time complexities per operation?", "How do you keep the heaps balanced?"],
+    ["two heaps", "max heap", "min heap", "balance", "log n", "median", "insert"],
+    "Keep a max-heap of the lower half and a min-heap of the upper half, sizes balanced within one. Insert into the appropriate heap, then rebalance by moving a root across if sizes differ by more than one; the median is the top of the larger heap (or the average of the two tops). Insert is O(log n), median query O(1). State the invariant (all of lower ≤ all of upper, sizes balanced) before coding — Google wants the reasoning.",
+    "medium", ["google", "microsoft", "meta"]),
+  Q("amzn-lp-1", "behavioral",
+    "Tell me about a time you disagreed with a decision your team had already committed to. What did you do?",
+    ["What was the outcome?", "Would you do the same again?", "How did you rebuild alignment afterward?"],
+    ["disagree and commit", "data", "escalate", "ownership", "outcome", "STAR", "backbone"],
+    "This maps to Amazon's 'Have Backbone; Disagree and Commit'. Use STAR: the situation, your specific disagreement backed by data (not opinion), how you voiced it respectfully and to the right person, and crucially — that once the decision stood, you committed fully rather than sabotaging it. End with the outcome and what you learned. They're testing judgement plus the ability to move forward after losing an argument.",
+    "medium", ["amazon"]),
+  Q("goog-sysdes-1", "system-design",
+    "Design a URL shortener like tinyurl. Start with the requirements, not the database.",
+    ["How do you generate short keys without collisions?", "How do you scale reads vs writes?", "Where does caching help most?"],
+    ["requirements", "hashing", "base62", "key generation", "cache", "read heavy", "sharding", "collision"],
+    "Clarify scale and requirements first (read-heavy, short unique keys, redirect latency). Generate keys by base62-encoding an incrementing ID or hashing+collision-check. It's read-dominated, so cache hot mappings (the long tail is cold), replicate reads, and shard the store by key. Discuss the redirect path (301 vs 302), custom aliases, and analytics as extensions. Starting from requirements and reads/writes ratio — not jumping to a schema — is what's evaluated.",
+    "hard", ["google", "microsoft", "amazon", "meta"]),
+
+  // ---------------- ML / AI — OpenAI / Anthropic / NVIDIA / Google ----------------
+  Q("ai-1", "ml-ai",
+    "Why does the transformer's attention divide by √(d_k)? What breaks if you don't?",
+    ["What happens to the softmax with large dot products?", "How does this interact with gradient flow?", "Why d_k and not d_model?"],
+    ["scaled dot product", "softmax", "variance", "saturation", "gradients", "dimension", "vanishing"],
+    "Dot products of two d_k-dimensional vectors have variance growing with d_k, so unscaled scores get large in magnitude, pushing softmax into a near-one-hot, saturated regime where gradients vanish and training stalls. Dividing by √(d_k) normalises the score variance to ~1 regardless of dimension, keeping softmax in a responsive range. It's d_k (the key dimension entering the dot product), not d_model.",
+    "hard", ["openai", "anthropic", "nvidia", "google"]),
+  Q("ai-2", "ml-ai",
+    "Your model gets 99% accuracy on a fraud dataset. Why might that be worthless, and what would you report instead?",
+    ["What does class imbalance do to accuracy?", "Precision vs recall — which matters here and why?", "How would you choose the operating threshold?"],
+    ["class imbalance", "accuracy", "precision", "recall", "auc", "confusion matrix", "base rate"],
+    "If fraud is 1% of cases, predicting 'never fraud' scores 99% accuracy while catching nothing — accuracy is meaningless under heavy class imbalance. Report precision/recall (or PR-AUC), the confusion matrix, and choose the threshold from the business cost of a missed fraud vs a false alarm. Fraud usually weights recall (don't miss fraud) but false positives cost customer friction, so it's an explicit trade set by cost, not by maximising accuracy.",
+    "medium", ["openai", "anthropic", "google", "amazon"]),
+
+  // ---------------- Data science ----------------
+  Q("ds-1", "data-science",
+    "Your A/B test shows the new feature lifts conversion by 2%, p = 0.04. Do you ship it?",
+    ["What would you check before trusting that p-value?", "What's the difference between statistical and practical significance?", "How do peeking and multiple tests bite you?"],
+    ["p-value", "practical significance", "sample size", "peeking", "power", "effect size", "confidence interval"],
+    "Not automatically. Check the test was valid: pre-registered sample size and duration (no peeking/early stopping, which inflates false positives), sufficient power, no novelty effect or seasonality, and whether many metrics were tested (multiple comparisons). Then separate statistical from practical significance — a 2% lift with p=0.04 might be real but within noise of the cost to build/maintain. Ship on the confidence interval and business value, not the p-value alone.",
+    "medium", ["google", "meta", "amazon"]),
+
+  // ---------------- PhD / MS admission panel ----------------
+  Q("phd-1", "research",
+    "What's the open problem in your field you'd most want to spend five years on, and why isn't it solved yet?",
+    ["What's the current state of the art and its limitation?", "What would a first meaningful result look like?", "Why are you the right person for it?"],
+    ["open problem", "state of the art", "limitation", "gap", "approach", "motivation", "feasibility"],
+    "A PhD panel is testing research taste and self-direction. Name a specific, real open problem (not a vague grand challenge), explain the current state of the art and the precise reason it's stuck (a missing method, data, or theory), sketch what a first tractable result would be, and connect it to your own skills and prior work. Depth and honesty about difficulty beat over-ambitious hand-waving.",
+    "hard", ["iitb-phd"]),
+  Q("phd-2", "hr",
+    "A PhD is five-plus years, often frustrating, for a fraction of industry pay. Why do it?",
+    ["How do you handle long stretches with no progress?", "Academia or industry research afterward?", "What sustains you when experiments fail?"],
+    ["intrinsic", "curiosity", "resilience", "research", "long term", "autonomy", "contribution"],
+    "They're screening for intrinsic motivation and resilience, because the failure rate of under-motivated PhDs is high. A credible answer is specific about what draws you to open-ended research (autonomy, contributing new knowledge, a problem you can't stop thinking about), acknowledges the frustration honestly, and shows how you cope with long no-progress stretches. 'It's the next step' or 'I like studying' is a weak signal.",
+    "easy", ["iitb-phd"]),
+
+  // ---------------- Company-true questions IN core technical categories ----------------
+  //  So a technical interview for a company's own role is differentiated,
+  //  not the same generic aero pool for every company.
+
+  // Aerodynamics — flavoured by the vehicle each company builds
+  Q("aero-isro-reentry", "aerodynamics",
+    "For a re-entry capsule, why is a BLUNT body better than a sharp, streamlined one? It seems backwards.",
+    ["Where does most of the heat go with a blunt body?", "What's the bow shock doing for you?", "How does this set the TPS design?"],
+    ["blunt body", "bow shock", "detached shock", "heat flux", "boundary layer", "stagnation", "tps"],
+    "A blunt body forms a strong detached bow shock that stands off the surface; most of the enormous kinetic energy is dumped into heating the shock layer (the air), and is convected away rather than into the vehicle. A sharp body would attach the shock and concentrate heat flux at the tip, melting it. So bluntness trades higher drag (which you want for deceleration anyway) for drastically lower surface heating — Allen–Eggers' insight, and why re-entry capsules are blunt.",
+    "hard", ["isro", "drdo", "spacex", "blueorigin"]),
+  Q("aero-airbus-highlift", "aerodynamics",
+    "Walk me through what happens aerodynamically when an airliner deploys flaps and slats on approach.",
+    ["Why a slat at the leading edge specifically?", "What does the slot between flap elements do?", "Why does the stall angle change?"],
+    ["camber", "cl max", "slat", "slot", "boundary layer", "stall angle", "circulation", "high lift"],
+    "Flaps increase camber and effective area, raising CLmax so the wing flies slower — essential for approach speed. Slats and slotted flaps add leading/trailing-edge devices that re-energise the boundary layer through the slot, delaying separation and pushing the stall to a higher angle of attack. The net effect is a much higher usable lift coefficient at low speed, at the cost of large drag (useful on approach) and structural/mechanical complexity.",
+    "medium", ["airbus", "boeing", "hal"]),
+  Q("aero-drdo-transonic", "aerodynamics",
+    "Why does drag rise so sharply near Mach 1, and how do combat aircraft deal with it?",
+    ["What is the drag-divergence Mach number?", "What's the area rule?", "How does supercritical aerofoil help?"],
+    ["wave drag", "drag divergence", "shock", "area rule", "supercritical", "transonic", "coalesce"],
+    "Approaching Mach 1, local flow over the wing goes supersonic and terminates in shocks; shock formation plus shock-induced separation causes a steep wave-drag rise at the drag-divergence Mach number. Fixes: sweep (reduces effective normal Mach), supercritical aerofoils (flatter top delays and weakens the shock), and the area rule (smooth the total cross-sectional area distribution so the fuselage waists at the wing to cut transonic wave drag). Combat aircraft use all three.",
+    "hard", ["drdo", "hal"]),
+
+  // Flight mechanics — ISRO/DRDO launch & missile flavour
+  Q("fm-isro-gravityturn", "flight-mechanics",
+    "Why do launch vehicles fly a 'gravity turn' rather than going straight up then turning?",
+    ["What are gravity losses?", "Why not steer aggressively with the engines?", "How does it trade against aerodynamic loads?"],
+    ["gravity turn", "gravity losses", "pitch program", "angle of attack", "zero lift", "trajectory", "efficiency"],
+    "Going straight up wastes energy fighting gravity the whole way (gravity losses) and ends with a huge, fuel-costly turn to horizontal for orbit. A gravity turn starts with a small pitch-over just after lift-off, then lets gravity gradually bend the near-zero-angle-of-attack trajectory toward horizontal — keeping angle of attack ≈ 0 minimises aerodynamic loads and steering losses. It's the fuel-optimal compromise between gravity losses and aerodynamic/steering losses.",
+    "hard", ["isro", "spacex", "blueorigin"]),
+
+  // CFD — company-flavoured
+  Q("cfd-ge-turbo", "cfd",
+    "You're doing CFD of a turbine blade row. What makes it harder than an external wing simulation?",
+    ["How do you handle the rotating frame?", "Why is heat transfer prediction so sensitive?", "What about the rotor-stator interface?"],
+    ["rotating frame", "periodic", "heat transfer", "y+", "mixing plane", "transition", "secondary flow"],
+    "Turbomachinery CFD adds rotation (moving reference frame / multiple reference frames), strong secondary flows and tip-leakage vortices, and rotor–stator coupling handled by mixing-plane or sliding-mesh interfaces. Heat transfer prediction is acutely sensitive to near-wall resolution (low y+) and to laminar–turbulent transition, which drives blade cooling design. Periodicity lets you model a single passage. It's more constrained and more transition/heat-transfer-sensitive than an external aero case.",
+    "hard", ["ge-aero", "rolls-royce"]),
+
+  // Structures — SpaceX/Airbus flavour in the structures category
+  Q("str-spacex-tank", "structures",
+    "A rocket propellant tank is a thin cylinder under internal pressure AND axial launch loads. How do these interact?",
+    ["Does pressurisation help or hurt the axial buckling?", "What's the worst load case — full or empty?", "Why might you pressure-stabilise?"],
+    ["hoop stress", "axial", "buckling", "pressure stabilised", "combined loading", "launch loads", "thin shell"],
+    "Internal pressure puts the skin in tension (hoop pd/2t, axial pd/4t); the axial launch load adds compression. Pressurisation actually HELPS buckling — the tensile pre-stress raises the compressive load the shell can take before buckling, so a pressure-stabilised tank (Atlas-style) can be extremely thin. The dangerous case is often an empty or vented tank still carrying axial load without the stabilising pressure. You design the combined stress state, not each load alone.",
+    "hard", ["spacex", "blueorigin", "isro"]),
+
+  // Non-core roles get company flavour too
+  Q("quant-jpm-cards", "quant",
+    "You draw cards one at a time from a shuffled deck. What's the expected number of cards until the first ace?",
+    ["Set it up by symmetry.", "Where do the 4 aces divide the deck?", "What's the general formula?"],
+    ["symmetry", "expectation", "10.6", "gaps", "uniform", "linearity", "spacing"],
+    "By symmetry the 4 aces divide the other 48 cards into 5 gaps of equal expected size 48/5 = 9.6; the first ace sits after the first gap, so expected position = 9.6 + 1 = 10.6. Equivalently E[position of first of k successes among n] = (n+1)/(k+1) = 53/5 = 10.6. The symmetry/linearity argument is the point — brute-force summation also works but they want the elegant setup.",
+    "medium", ["jpmorgan", "goldman"]),
+  Q("ds-meta-metric", "data-science",
+    "You launch a feature and daily active users go up but time-per-session goes down. Is that good?",
+    ["How do you decide which metric is the true north?", "What could cause both to move like this?", "What guardrail metrics would you watch?"],
+    ["tradeoff", "north star", "engagement", "guardrail", "segment", "causal", "counter metric"],
+    "It's ambiguous without a north-star tied to actual value. More DAU but shorter sessions could mean the feature makes people efficient (good) or that it fragments engagement (bad). Decide by the goal metric (e.g. retention, tasks completed, revenue) and watch guardrails (retention, complaints). Segment the movement — is it new vs existing users? — and be wary of correlation without a causal read. The judgement, not a yes/no, is what's scored.",
+    "medium", ["meta", "google", "amazon"]),
+  Q("prod-amzn-metric", "product",
+    "How would you measure the success of Amazon's 'Subscribe & Save'? Pick the one metric you'd optimise.",
+    ["Why that metric over revenue?", "What's the risk of optimising it too hard?", "How does it tie to long-term value?"],
+    ["retention", "ltv", "repeat purchase", "north star", "churn", "guardrail", "customer obsession"],
+    "The single metric should proxy long-term customer value — repeat purchase rate or subscription retention (churn) beats raw revenue, because Subscribe & Save's whole point is durable, habitual purchasing and higher LTV. Optimising it too hard risks pushing unwanted subscriptions (returns, complaints), so pair it with a satisfaction/cancellation guardrail. Framing it around customer obsession and LTV, not a vanity number, is the Amazon-flavoured answer.",
+    "medium", ["amazon"]),
+  Q("code-meta-clean", "coding",
+    "Given two strings, determine if one is a permutation of the other. Discuss approaches and trade-offs.",
+    ["Time and space of each approach?", "What if the strings are huge and mostly ASCII?", "How does Unicode change it?"],
+    ["hash map", "character count", "sort", "o(n)", "o(1) space", "frequency", "tradeoff"],
+    "Two clean approaches: sort both and compare (O(n log n) time, O(1) extra if in place), or count character frequencies in a hash map / fixed array and compare (O(n) time, O(k) space in the alphabet size). For ASCII a 128/256-int array is O(1) space and fastest; for Unicode a hash map generalises. State the trade (time vs space, alphabet assumptions) and pick the counting approach for large inputs — Meta/Google score the trade-off discussion.",
+    "easy", ["meta", "google", "microsoft"]),
 ];
 
 /** Questions in a category, hardest last. */
@@ -1063,12 +1316,29 @@ const RELATED: Record<Category, Category[]> = {
  * run dry, top up from related categories so a focused mode still fills a
  * long interview rather than ending after a handful of questions.
  */
-export function buildQuestionSet(categories: Category[], count: number): BankQuestion[] {
+export function buildQuestionSet(
+  categories: Category[],
+  count: number,
+  companyId?: string
+): BankQuestion[] {
   const used = new Set<string>();
   const out: BankQuestion[] = [];
 
+  // Order a category's pool so questions this company actually asks come
+  // first, generic questions next, and questions specific to OTHER companies
+  // last — that is what makes a set "true to the company" while still staying
+  // on the right field. Ties are shuffled so sessions don't repeat.
+  const rank = (q: BankQuestion): number => {
+    if (!companyId) return q.companies?.length ? 0 : 1; // no company: generic first
+    if (q.companies?.includes(companyId)) return 2;
+    if (!q.companies?.length) return 1;
+    return 0;
+  };
+  const orderPool = (qs: BankQuestion[]): BankQuestion[] =>
+    shuffle(qs).sort((a, b) => rank(b) - rank(a));
+
   const drain = (cats: Category[]) => {
-    const pools = cats.map((c) => shuffle(questionsIn(c).filter((q) => !used.has(q.id))));
+    const pools = cats.map((c) => orderPool(questionsIn(c).filter((q) => !used.has(q.id))));
     let idx = 0;
     let guard = 0;
     while (out.length < count && pools.some((p) => p.length > 0) && guard++ < 500) {

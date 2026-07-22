@@ -73,6 +73,13 @@ export interface BankQuestion {
   keywords: string[];
   ideal: string;
   difficulty: "easy" | "medium" | "hard";
+  /**
+   * Company ids this question is specifically true to (real, researched
+   * questions those panels actually ask). Untagged questions are generic and
+   * may appear for any company. Selection prefers company-tagged questions
+   * when the interview's company is known.
+   */
+  companies?: string[];
 }
 
 /** Per-answer evaluation, stored silently during the interview. */
