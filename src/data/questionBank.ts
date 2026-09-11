@@ -1,4 +1,5 @@
 import type { BankQuestion, Category } from "@/lib/types";
+import { PLACEMENT_QUESTIONS } from "./placementBank";
 
 /**
  * Interview question bank. Each question carries follow-ups (asked adaptively),
@@ -7,6 +8,10 @@ import type { BankQuestion, Category } from "@/lib/types";
  *
  * To extend: append questions to any category array. The scripted engine and
  * the AI engine both draw seeds from here.
+ *
+ * The bank also carries every question from the Myplacement prep app
+ * (placementBank.ts): numericals and MCQs graded exactly, plus interview and
+ * resume questions converted to open ones. See ALL_QUESTIONS below.
  */
 
 const Q = (
@@ -20,7 +25,7 @@ const Q = (
   companies?: string[]
 ): BankQuestion => ({ id, category, question, followUps, keywords, ideal, difficulty, companies });
 
-export const QUESTION_BANK: BankQuestion[] = [
+const INTERVIEW_BANK: BankQuestion[] = [
   // ---------------- Aerodynamics ----------------
   Q("aero-1", "aerodynamics",
     "Walk me through what physically generates lift on a wing. I don't want 'equal transit time'.",
@@ -1276,7 +1281,10 @@ export const QUESTION_BANK: BankQuestion[] = [
     "easy", ["meta", "google", "microsoft"]),
 ];
 
-/** Questions in a category, hardest last. */
+/** The hand-written interview bank plus everything imported from Myplacement. */
+export const QUESTION_BANK: BankQuestion[] = [...INTERVIEW_BANK, ...PLACEMENT_QUESTIONS];
+
+/** Questions in a category. */
 export function questionsIn(category: Category): BankQuestion[] {
   return QUESTION_BANK.filter((q) => q.category === category);
 }
@@ -1308,6 +1316,11 @@ const RELATED: Record<Category, Category[]> = {
   research: ["project", "behavioral", "ml-ai"],
   project: ["resume", "behavioral", "research"],
   "rapid-fire": ["coding", "aerodynamics", "quant"],
+  aptitude: ["reasoning", "quant", "verbal"],
+  reasoning: ["aptitude", "quant", "case-study"],
+  verbal: ["reasoning", "hr", "behavioral"],
+  "engineering-maths": ["cfd", "structures", "flight-mechanics"],
+  "cs-fundamentals": ["coding", "system-design", "rapid-fire"],
 };
 
 /**
@@ -1315,11 +1328,15 @@ const RELATED: Record<Category, Category[]> = {
  * categories in priority order, round-robin, up to `count`. If those pools
  * run dry, top up from related categories so a focused mode still fills a
  * long interview rather than ending after a handful of questions.
+ *
+ * `weights` (parallel to `categories`) biases the round-robin — the
+ * Analytical round draws aptitude 3 : reasoning 2 : verbal 1.
  */
 export function buildQuestionSet(
   categories: Category[],
   count: number,
-  companyId?: string
+  companyId?: string,
+  weights?: number[]
 ): BankQuestion[] {
   const used = new Set<string>();
   const out: BankQuestion[] = [];
@@ -1334,25 +1351,36 @@ export function buildQuestionSet(
     if (!q.companies?.length) return 1;
     return 0;
   };
-  const orderPool = (qs: BankQuestion[]): BankQuestion[] =>
-    shuffle(qs).sort((a, b) => rank(b) - rank(a));
+  // Within a category, alternate discussion questions with exactly-graded
+  // ones (numericals / MCQs). The imported Myplacement questions outnumber
+  // the discussion questions several times over; without this a technical
+  // round would turn into a quiz. Alternate categories start on opposite
+  // kinds, so the session itself mixes them rather than front-loading every
+  // discussion question.
+  const orderPool = (qs: BankQuestion[], openFirst: boolean): BankQuestion[] => {
+    const sorted = shuffle(qs).sort((a, b) => rank(b) - rank(a));
+    const open = sorted.filter((q) => !q.check);
+    const graded = sorted.filter((q) => q.check);
+    return openFirst ? interleave(open, graded) : interleave(graded, open);
+  };
 
-  const drain = (cats: Category[]) => {
-    const pools = cats.map((c) => orderPool(questionsIn(c).filter((q) => !used.has(q.id))));
-    let idx = 0;
+  const drain = (cats: Category[], w?: number[]) => {
+    const pools = cats.map((c, i) => orderPool(questionsIn(c).filter((q) => !used.has(q.id)), i % 2 === 0));
+    const cycle = weightedCycle(cats.map((_, i) => Math.max(1, Math.round(w?.[i] ?? 1))));
+    let step = 0;
     let guard = 0;
-    while (out.length < count && pools.some((p) => p.length > 0) && guard++ < 500) {
-      const pool = pools[idx % pools.length];
+    while (out.length < count && pools.some((p) => p.length > 0) && guard++ < 5000) {
+      const pool = pools[cycle[step % cycle.length]];
+      step++;
       const q = pool.shift();
-      if (q && !used.has(q.id)) {
+      if (q && !used.has(q.id) && !nearDuplicate(q, out)) {
         used.add(q.id);
         out.push(q);
       }
-      idx++;
     }
   };
 
-  drain(categories);
+  drain(categories, weights);
 
   if (out.length < count) {
     const fallback = [...new Set(categories.flatMap((c) => RELATED[c] ?? []))].filter(
@@ -1362,6 +1390,73 @@ export function buildQuestionSet(
   }
 
   return out;
+}
+
+/** a1, b1, a2, b2, ... then whatever is left of the longer list. */
+function interleave<T>(a: T[], b: T[]): T[] {
+  const out: T[] = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (i < a.length) out.push(a[i]);
+    if (i < b.length) out.push(b[i]);
+  }
+  return out;
+}
+
+/**
+ * Smooth weighted round-robin: weights [3, 2, 1] give 0,1,0,2,0,1 — spread
+ * out rather than 0,0,0,1,1,2, so a short interview still sees each category.
+ */
+function weightedCycle(weights: number[]): number[] {
+  const total = weights.reduce((a, b) => a + b, 0);
+  const current = weights.map(() => 0);
+  const seq: number[] = [];
+  for (let k = 0; k < total; k++) {
+    let best = 0;
+    weights.forEach((w, i) => {
+      current[i] += w;
+      if (current[i] > current[best]) best = i;
+    });
+    current[best] -= total;
+    seq.push(best);
+  }
+  return seq;
+}
+
+/** Words too common to say two questions are about the same thing. */
+const COMMON = new Set([
+  "which", "would", "about", "there", "their", "these", "those", "following", "through", "answer",
+  "correct", "option", "where", "other", "could", "should", "being", "between", "given", "value",
+  "using", "first", "after", "before", "right", "point", "while", "under", "without", "think",
+  "explain", "describe", "difference", "happens", "change", "changes", "tell", "walk",
+]);
+
+function signature(q: BankQuestion): Set<string> {
+  // For read-out MCQs, judge by the stem — the options would dilute the overlap.
+  const text = q.check?.kind === "choice" ? q.question.split(/\s\(A\)\s/)[0] : q.question;
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 5 && !COMMON.has(w))
+      .map((w) => w.replace(/(ing|ed|es|s)$/, ""))
+  );
+}
+
+/**
+ * True when a question is essentially one already in the set — "why sweep a
+ * wing" asked twice, or two near-identical train problems back to back.
+ */
+function nearDuplicate(q: BankQuestion, chosen: BankQuestion[]): boolean {
+  const a = signature(q);
+  if (a.size < 3) return false;
+  return chosen.some((c) => {
+    const b = signature(c);
+    if (b.size < 3) return false;
+    let inter = 0;
+    for (const w of a) if (b.has(w)) inter++;
+    return inter / (a.size + b.size - inter) >= 0.5;
+  });
 }
 
 function shuffle<T>(arr: T[]): T[] {

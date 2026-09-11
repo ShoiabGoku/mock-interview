@@ -16,69 +16,70 @@ const P = (
 ): Interviewer => ({ id, name, role, department, avatar, personality, focus, style });
 
 const TECH_PANEL: Interviewer[] = [
-  P("t1", "Priya Nair", "Senior SWE", "Engineering", "👩‍💻", "Precise and methodical; probes edge cases relentlessly.", ["coding"], "skeptical"),
+  P("t1", "Priya Nair", "Senior SWE", "Engineering", "👩‍💻", "Precise and methodical; probes edge cases relentlessly.", ["coding", "cs-fundamentals", "reasoning"], "skeptical"),
   P("t2", "Daniel Cho", "Staff Engineer", "Infrastructure", "👨‍💼", "Big-picture thinker; cares about trade-offs and scale.", ["system-design"], "curious"),
   P("t3", "Sara Alvi", "Engineering Manager", "Product Eng", "👩‍💼", "Warm but sharp; listens for ownership and collaboration.", ["behavioral", "project"], "warm"),
-  P("t4", "Marcus Webb", "Bar Raiser", "Hiring Committee", "🧐", "Deliberately challenging; interrupts to test composure.", ["coding", "behavioral", "rapid-fire"], "rapid"),
-  P("t5", "Anita Rao", "HR Partner", "People Ops", "🙂", "Friendly; evaluates culture fit and clarity of motivation.", ["hr", "resume"], "warm"),
+  P("t4", "Marcus Webb", "Bar Raiser", "Hiring Committee", "🧐", "Deliberately challenging; interrupts to test composure.", ["coding", "behavioral", "rapid-fire", "aptitude", "reasoning"], "rapid"),
+  P("t5", "Anita Rao", "HR Partner", "People Ops", "🙂", "Friendly; evaluates culture fit and clarity of motivation.", ["hr", "resume", "verbal"], "warm"),
 ];
 
 const AI_PANEL: Interviewer[] = [
   P("a1", "Dr. Elena Sorokin", "Research Scientist", "ML Research", "👩‍🔬", "Asks 'why' three times; allergic to hand-waving.", ["ml-ai", "research"], "curious"),
-  P("a2", "Rohit Menon", "ML Engineer", "Applied AI", "👨‍💻", "Practical; wants working systems, not just theory.", ["ml-ai", "coding"], "skeptical"),
-  P("a3", "Grace Liu", "Data Science Lead", "Analytics", "📊", "Loves metrics; asks how you'd measure everything.", ["data-science"], "formal"),
+  P("a2", "Rohit Menon", "ML Engineer", "Applied AI", "👨‍💻", "Practical; wants working systems, not just theory.", ["ml-ai", "coding", "cs-fundamentals", "reasoning"], "skeptical"),
+  P("a3", "Grace Liu", "Data Science Lead", "Analytics", "📊", "Loves metrics; asks how you'd measure everything.", ["data-science", "aptitude", "reasoning", "engineering-maths"], "formal"),
   P("a4", "James Okafor", "Hiring Manager", "AI Platform", "👔", "Evaluates judgment and communication under ambiguity.", ["behavioral", "project"], "warm"),
-  P("a5", "Nisha Patel", "HR Partner", "People", "🙂", "Checks motivation, expectations and team fit.", ["hr", "resume"], "warm"),
+  P("a5", "Nisha Patel", "HR Partner", "People", "🙂", "Checks motivation, expectations and team fit.", ["hr", "resume", "verbal"], "warm"),
 ];
 
 const AEROSPACE_PANEL: Interviewer[] = [
-  P("ae1", "Dr. Hélène Moreau", "Aerodynamics Lead", "Aero Dept", "🌀", "Rigorous; expects equations and physical intuition together.", ["aerodynamics", "cfd"], "formal"),
+  P("ae1", "Dr. Hélène Moreau", "Aerodynamics Lead", "Aero Dept", "🌀", "Rigorous; expects equations and physical intuition together.", ["aerodynamics", "cfd", "engineering-maths"], "formal"),
   P("ae2", "Stefan Krause", "Structures Engineer", "Airframe", "🏗️", "Detail-obsessed; asks about failure modes and margins.", ["structures"], "skeptical"),
-  P("ae3", "Meera Iyer", "Flight Mechanics Engineer", "Flight Physics", "✈️", "Enjoys performance and stability puzzles.", ["flight-mechanics", "controls"], "curious"),
+  P("ae3", "Meera Iyer", "Flight Mechanics Engineer", "Flight Physics", "✈️", "Enjoys performance and stability puzzles.", ["flight-mechanics", "controls", "aptitude", "reasoning", "engineering-maths"], "curious"),
   P("ae4", "Tom Bradley", "Engineering Manager", "Design Office", "👔", "Wants clear thinking and teamwork stories.", ["behavioral", "project"], "warm"),
-  P("ae5", "Lucia Femia", "HR Business Partner", "People", "🙂", "Assesses mobility, motivation and long-term fit.", ["hr", "resume"], "warm"),
+  P("ae5", "Lucia Femia", "HR Business Partner", "People", "🙂", "Assesses mobility, motivation and long-term fit.", ["hr", "resume", "verbal"], "warm"),
 ];
 
 const ISRO_PANEL: Interviewer[] = [
-  P("is1", "Dr. K. Raghavan", "Propulsion Scientist", "LPSC", "🚀", "Old-school rigor; starts from fundamentals and digs.", ["propulsion", "thermal"], "formal"),
+  P("is1", "Dr. K. Raghavan", "Propulsion Scientist", "LPSC", "🚀", "Old-school rigor; starts from fundamentals and digs.", ["propulsion", "thermal", "engineering-maths"], "formal"),
   P("is2", "Dr. S. Lakshmi", "Aerodynamics Expert", "VSSC", "🌀", "Quietly incisive; loves compressible flow.", ["aerodynamics", "cfd"], "curious"),
   P("is3", "A. Venkatesh", "Structures Scientist", "Structures Entity", "🏗️", "Asks about loads, vibrations and materials.", ["structures"], "skeptical"),
-  P("is4", "Dr. P. Unnikrishnan", "Mathematics Expert", "Applied Math", "📐", "Rapid-fire numericals; checks first-principles maths.", ["rapid-fire", "flight-mechanics"], "rapid"),
-  P("is5", "R. Devi", "Admin Officer", "HR", "🙂", "Formal but kind; motivation and commitment questions.", ["hr"], "formal"),
+  P("is4", "Dr. P. Unnikrishnan", "Mathematics Expert", "Applied Math", "📐", "Rapid-fire numericals; checks first-principles maths.", ["rapid-fire", "flight-mechanics", "engineering-maths", "aptitude", "reasoning"], "rapid"),
+  P("is5", "R. Devi", "Admin Officer", "HR", "🙂", "Formal but kind; motivation and commitment questions.", ["hr", "verbal"], "formal"),
 ];
 
 const AUTO_RD_PANEL: Interviewer[] = [
-  P("au1", "Dr. Felix Braun", "CAE Lead", "R&D Simulation", "🖥️", "Simulation depth: meshing, validation, correlation.", ["cfd", "structures"], "formal"),
-  P("au2", "Kavya Krishnan", "Thermal Engineer", "Powertrain", "🔥", "Heat transfer everywhere; loves practical estimates.", ["thermal"], "curious"),
+  P("au1", "Dr. Felix Braun", "CAE Lead", "R&D Simulation", "🖥️", "Simulation depth: meshing, validation, correlation.", ["cfd", "structures", "engineering-maths"], "formal"),
+  P("au2", "Kavya Krishnan", "Thermal Engineer", "Powertrain", "🔥", "Heat transfer everywhere; loves practical estimates.", ["thermal", "aptitude", "reasoning"], "curious"),
   P("au3", "Martin Vogel", "Manufacturing Engineer", "Production", "🏭", "Design-for-manufacture; costs and tolerances.", ["structures", "project"], "skeptical"),
   P("au4", "Shruti Deshpande", "Team Lead", "Vehicle Dynamics", "👩‍💼", "Behavioral depth and cross-team collaboration.", ["behavioral", "flight-mechanics"], "warm"),
-  P("au5", "Hans Weber", "HR Manager", "People", "🙂", "Relocation, teamwork, and language of motivation.", ["hr", "resume"], "warm"),
+  P("au5", "Hans Weber", "HR Manager", "People", "🙂", "Relocation, teamwork, and language of motivation.", ["hr", "resume", "verbal"], "warm"),
 ];
 
 const SEMI_PANEL: Interviewer[] = [
-  P("s1", "Arjun Reddy", "Systems Engineer", "SoC Design", "🔌", "Signals, circuits, and low-level fundamentals.", ["controls", "coding"], "skeptical"),
-  P("s2", "Wei Zhang", "Senior Engineer", "Embedded", "👨‍💻", "Bit-level precision; C and memory questions.", ["coding", "rapid-fire"], "rapid"),
+  P("s1", "Arjun Reddy", "Systems Engineer", "SoC Design", "🔌", "Signals, circuits, and low-level fundamentals.", ["controls", "coding", "engineering-maths", "reasoning"], "skeptical"),
+  P("s2", "Wei Zhang", "Senior Engineer", "Embedded", "👨‍💻", "Bit-level precision; C and memory questions.", ["coding", "rapid-fire", "cs-fundamentals", "aptitude"], "rapid"),
   P("s3", "Diego Marín", "Engineering Manager", "Platform", "👔", "Projects, ownership, and debugging war stories.", ["behavioral", "project"], "warm"),
-  P("s4", "Fatima Khan", "HR Partner", "People", "🙂", "Fit, expectations, and career trajectory.", ["hr", "resume"], "warm"),
+  P("s4", "Fatima Khan", "HR Partner", "People", "🙂", "Fit, expectations, and career trajectory.", ["hr", "resume", "verbal"], "warm"),
 ];
 
 const CONSULTING_PANEL: Interviewer[] = [
-  P("c1", "Alexandra Hunt", "Engagement Manager", "Strategy", "📈", "Classic case interviewer; structure is everything.", ["case-study"], "formal"),
-  P("c2", "Vikram Sethi", "Associate Partner", "Operations", "🧮", "Pushes on numbers; expects fast mental math.", ["case-study", "quant", "rapid-fire"], "rapid"),
-  P("c3", "Sophie Martin", "Recruiting Lead", "Talent", "🙂", "Personal-impact and leadership stories.", ["behavioral", "hr", "resume"], "warm"),
+  P("c1", "Alexandra Hunt", "Engagement Manager", "Strategy", "📈", "Classic case interviewer; structure is everything.", ["case-study", "reasoning"], "formal"),
+  P("c2", "Vikram Sethi", "Associate Partner", "Operations", "🧮", "Pushes on numbers; expects fast mental math.", ["case-study", "quant", "rapid-fire", "aptitude", "reasoning"], "rapid"),
+  P("c3", "Sophie Martin", "Recruiting Lead", "Talent", "🙂", "Personal-impact and leadership stories.", ["behavioral", "hr", "resume", "verbal"], "warm"),
 ];
 
 const FINANCE_PANEL: Interviewer[] = [
-  P("f1", "Dmitri Volkov", "Quant Researcher", "Trading Strategies", "📉", "Probability brainteasers; zero tolerance for bluffing.", ["quant"], "skeptical"),
-  P("f2", "Rachel Goldman", "VP Technology", "Trading Systems", "👩‍💻", "Low-latency systems and clean code.", ["coding", "system-design"], "formal"),
-  P("f3", "Aditya Jain", "Desk Strategist", "Markets", "🧮", "Rapid-fire mental math and market intuition.", ["quant", "rapid-fire"], "rapid"),
-  P("f4", "Emma Collins", "HR Associate", "Campus Recruiting", "🙂", "Motivation for finance; teamwork under pressure.", ["hr", "behavioral"], "warm"),
+  P("f1", "Dmitri Volkov", "Quant Researcher", "Trading Strategies", "📉", "Probability brainteasers; zero tolerance for bluffing.", ["quant", "reasoning", "aptitude"], "skeptical"),
+  P("f2", "Rachel Goldman", "VP Technology", "Trading Systems", "👩‍💻", "Low-latency systems and clean code.", ["coding", "system-design", "cs-fundamentals"], "formal"),
+  P("f3", "Aditya Jain", "Desk Strategist", "Markets", "🧮", "Rapid-fire mental math and market intuition.", ["quant", "rapid-fire", "aptitude", "reasoning"], "rapid"),
+  P("f4", "Emma Collins", "HR Associate", "Campus Recruiting", "🙂", "Motivation for finance; teamwork under pressure.", ["hr", "behavioral", "verbal"], "warm"),
 ];
 
 const IT_PANEL: Interviewer[] = [
-  P("i1", "Suresh Kumar", "Technical Lead", "Delivery", "👨‍💻", "Fundamentals-first: DSA, SQL, OOP.", ["coding"], "formal"),
+  P("i1", "Suresh Kumar", "Technical Lead", "Delivery", "👨‍💻", "Fundamentals-first: DSA, SQL, OOP.", ["coding", "cs-fundamentals"], "formal"),
+  P("i4", "Arvind Rao", "Assessment Lead", "Campus Hiring", "🧮", "Runs the analytical round; wants the number and the shortcut.", ["aptitude", "reasoning", "verbal"], "rapid"),
   P("i2", "Deepa Menon", "Project Manager", "Client Services", "👩‍💼", "Communication, teamwork, client scenarios.", ["behavioral", "project"], "warm"),
-  P("i3", "Ravi Shastri", "HR Executive", "Talent Acquisition", "🙂", "Standard HR round; relocation and bond questions.", ["hr", "resume"], "warm"),
+  P("i3", "Ravi Shastri", "HR Executive", "Talent Acquisition", "🙂", "Standard HR round; relocation and bond questions.", ["hr", "resume", "verbal"], "warm"),
 ];
 
 export const COMPANIES: Company[] = [
@@ -116,8 +117,8 @@ export const COMPANIES: Company[] = [
   { id: "infosys", name: "Infosys", emoji: "💻", domain: "IT Services", panel: IT_PANEL, roles: ["swe", "get"] },
   { id: "wipro", name: "Wipro", emoji: "🌟", domain: "IT Services", panel: IT_PANEL, roles: ["swe", "get"] },
   { id: "iitb-phd", name: "PhD / MS Admission Panel", emoji: "🎓", domain: "Academia", panel: [
-    P("ph1", "Prof. R. Bhattacharya", "Professor", "Aerospace Engineering", "👨‍🏫", "Deep fundamentals; derives everything from first principles.", ["aerodynamics", "propulsion", "research"], "formal"),
-    P("ph2", "Prof. A. Desai", "Associate Professor", "Fluid Mechanics", "👩‍🏫", "Loves thought experiments and limiting cases.", ["cfd", "aerodynamics", "research"], "curious"),
+    P("ph1", "Prof. R. Bhattacharya", "Professor", "Aerospace Engineering", "👨‍🏫", "Deep fundamentals; derives everything from first principles.", ["aerodynamics", "propulsion", "research", "engineering-maths"], "formal"),
+    P("ph2", "Prof. A. Desai", "Associate Professor", "Fluid Mechanics", "👩‍🏫", "Loves thought experiments and limiting cases.", ["cfd", "aerodynamics", "research", "engineering-maths", "reasoning"], "curious"),
     P("ph3", "Prof. V. Kulkarni", "Professor", "Structures", "🧑‍🏫", "Asks why you want research, and whether you can survive it.", ["research", "behavioral", "structures"], "skeptical"),
   ], roles: ["phd", "ms"] },
 ];

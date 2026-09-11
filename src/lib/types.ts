@@ -20,7 +20,14 @@ export type Category =
   | "resume"
   | "research"
   | "project"
-  | "rapid-fire";
+  | "rapid-fire"
+  // Analytical round (imported from Myplacement's aptitude bank)
+  | "aptitude"
+  | "reasoning"
+  | "verbal"
+  // Core fundamentals that previously had no home
+  | "engineering-maths"
+  | "cs-fundamentals";
 
 export type Difficulty =
   | "beginner"
@@ -80,7 +87,24 @@ export interface BankQuestion {
    * when the interview's company is known.
    */
   companies?: string[];
+  /**
+   * A definitive answer, for questions imported from the Myplacement test
+   * banks. When present the offline engine grades the answer exactly (the
+   * number within tolerance, or the option picked) instead of by keywords.
+   */
+  check?: AnswerCheck;
+  /** Worked solution — shown only in the report, never mid-interview. */
+  solution?: { steps: string[]; concept: string; formula?: string; commonMistakes?: string[] };
+  /** Where the question came from, e.g. "myplacement:apt-050". */
+  source?: string;
 }
+
+export type AnswerCheck =
+  | { kind: "numeric"; value: number; tolerance: number }
+  | { kind: "choice"; options: string[]; correct: number[] };
+
+/** Outcome of an exactly-graded answer. */
+export type Verdict = "correct" | "partial" | "wrong" | "unclear" | "skipped";
 
 /** Per-answer evaluation, stored silently during the interview. */
 export interface AnswerEval {
@@ -92,6 +116,8 @@ export interface AnswerEval {
   structure: number;      // 0-10
   notes: string;
   missing: string[];
+  /** Set for exactly-graded questions. */
+  verdict?: Verdict;
 }
 
 export interface TranscriptEntry {
@@ -122,6 +148,9 @@ export interface QuestionFeedback {
   missingConcepts: string[];
   betterAnswer: string;
   confidence: number; // 0-10
+  /** Exactly-graded questions: whether the final answer was right, and what it was. */
+  verdict?: Verdict;
+  correctAnswer?: string;
 }
 
 export interface Report {

@@ -7,10 +7,19 @@ export interface InterviewMode {
   description: string;
   /** Categories this mode draws from; null = follow the role's focus (Mixed). */
   categories: Category[] | null;
+  /** Relative draw weights, parallel to `categories`. Omitted = equal. */
+  weights?: number[];
+  /**
+   * Follow the role's focus but keep only its technical areas. A technical
+   * round shouldn't spend a third of its time on HR and behavioural questions
+   * just because the role's focus list mentions them.
+   */
+  technicalOnly?: boolean;
 }
 
 export const MODES: InterviewMode[] = [
-  { id: "technical", name: "Technical Interview", emoji: "🔬", description: "Core subject and role fundamentals, probed in depth.", categories: null },
+  { id: "technical", name: "Technical Interview", emoji: "🔬", description: "Core subject and role fundamentals — discussion plus numericals, probed in depth.", categories: null, technicalOnly: true },
+  { id: "analytical", name: "Analytical / Aptitude Round", emoji: "🧮", description: "Quant aptitude, logical reasoning, puzzles and a little verbal. Work it out loud and commit to an answer.", categories: ["aptitude", "reasoning", "verbal"], weights: [3, 2, 1] },
   { id: "hr", name: "HR Interview", emoji: "🤝", description: "Motivation, fit, expectations, relocation.", categories: ["hr", "resume", "behavioral"] },
   { id: "behavioral", name: "Behavioral Interview", emoji: "💬", description: "Leadership, conflict, ownership — STAR stories.", categories: ["behavioral"] },
   { id: "resume", name: "Resume Deep Dive", emoji: "📄", description: "Line-by-line grilling on everything you claimed.", categories: ["resume", "project"] },

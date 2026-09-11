@@ -14,6 +14,16 @@ import { ProgressBar, StatRing } from "@/components/ui/progress";
 import { cn, useQueryParam } from "@/lib/utils";
 import { useStore, useHydrated } from "@/store/useStore";
 import { companyById } from "@/data/companies";
+import type { Verdict } from "@/lib/types";
+
+/** Badge for questions with one right answer (numericals, MCQs). */
+const VERDICT_BADGE: Record<Verdict, { label: string; tone: "success" | "warning" | "danger" | "neutral" }> = {
+  correct: { label: "✓ Correct", tone: "success" },
+  partial: { label: "◐ Partly right", tone: "warning" },
+  wrong: { label: "✗ Incorrect", tone: "danger" },
+  unclear: { label: "No final answer", tone: "warning" },
+  skipped: { label: "Skipped", tone: "neutral" },
+};
 
 const TIP = { backgroundColor: "var(--background)", border: "1px solid var(--card-border)", borderRadius: "12px", fontSize: "12px" };
 
@@ -159,6 +169,7 @@ export default function ReportPage() {
                   <p className={cn("text-sm font-medium", !open && "line-clamp-2")}>{q.question}</p>
                   <div className="mt-1 flex items-center gap-2">
                     <Badge tone={q.confidence >= 7 ? "success" : q.confidence >= 4 ? "warning" : "danger"}>Answer rated {q.confidence}/10</Badge>
+                    {q.verdict && <Badge tone={VERDICT_BADGE[q.verdict].tone}>{VERDICT_BADGE[q.verdict].label}</Badge>}
                   </div>
                 </div>
                 <ChevronDown size={16} className={cn("mt-1 shrink-0 transition-transform", open && "rotate-180")} />
@@ -166,7 +177,8 @@ export default function ReportPage() {
               {open && (
                 <div className="space-y-3 px-4 pb-4 text-sm">
                   <Section label="Your answer" muted>{q.answer}</Section>
-                  <Section label="What a strong answer covers" tone="success">{q.idealAnswer}</Section>
+                  {q.correctAnswer && <Section label="Correct answer" tone="success">{q.correctAnswer}</Section>}
+                  <Section label={q.correctAnswer ? "Worked solution" : "What a strong answer covers"} tone="success">{q.idealAnswer}</Section>
                   {q.strengths.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-success">Strengths</p>

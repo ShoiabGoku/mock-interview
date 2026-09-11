@@ -9,12 +9,35 @@ import type {
   Report,
   RoleDef,
   SessionConfig,
+  Verdict,
 } from "./types";
 import { buildQuestionSet } from "@/data/questionBank";
-import { categoriesFor } from "@/data/roles";
+import { planCategories } from "@/data/roles";
 import { modeById, questionCountFor } from "@/data/modes";
-import { answerQuality, avg, scoreAnswer } from "./scoring";
-import { bandFor, bridge, clarify, closer, interruption, isConfused, opener, reactionTo, transition } from "./dialogue";
+import { answerQuality, avg, gradedScore, scoreAnswer } from "./scoring";
+import { describeKey, gradeAnswer } from "./grading";
+import {
+  bandFor,
+  bridge,
+  clarify,
+  closer,
+  gradedCommit,
+  gradedCorrect,
+  gradedPartial,
+  gradedRecheck,
+  gradedUncommittedFinal,
+  gradedUnsure,
+  gradedWrongFinal,
+  interruption,
+  isConfused,
+  isUnsure,
+  movesOn,
+  opener,
+  reactionTo,
+  transition,
+  workingAck,
+  type Band,
+} from "./dialogue";
 import { RESOURCES } from "@/data/resources";
 
 /**
@@ -37,6 +60,13 @@ export interface PlannedItem {
   unsureCount: number;
   /** Times they asked for the question to be clarified. */
   clarifyCount: number;
+  /** Graded questions: answers given, and times asked to commit to one. */
+  attempts: number;
+  unclearCount: number;
+  /** Graded questions: the panel asked how they got a right answer. */
+  awaitingWorking: boolean;
+  /** Graded questions: most working shown across their turns, 0-1. */
+  bestReasoning: number;
 }
 
 export interface EnginePlan {
@@ -58,6 +88,10 @@ export class ScriptedEngine {
   private started = false;
   private evals: AnswerEval[] = [];
   private lastRaw: ReturnType<typeof scoreAnswer> | null = null;
+  /** Verdict of the last graded answer (null after an open question). */
+  private lastVerdict: Verdict | null = null;
+  /** Who asked the question that was just answered — notes and mood belong to them. */
+  private lastAskerId: string | null = null;
 
   constructor(
     private config: SessionConfig,
@@ -66,9 +100,9 @@ export class ScriptedEngine {
   ) {
     this.company = company;
     const mode = modeById(config.mode);
-    const cats = categoriesFor(role.focus, mode?.categories ?? null);
+    const { categories: cats, weights } = planCategories(role, mode);
     const count = questionCountFor(config.durationMin);
-    const bank = buildQuestionSet(cats.length ? cats : (["behavioral"] as Category[]), count, company.id);
+    const bank = buildQuestionSet(cats.length ? cats : (["behavioral"] as Category[]), count, company.id, weights);
     this.plan = {
       items: bank.map((bankQ) => ({
         bankQ,
@@ -77,6 +111,10 @@ export class ScriptedEngine {
         retries: 0,
         unsureCount: 0,
         clarifyCount: 0,
+        attempts: 0,
+        unclearCount: 0,
+        awaitingWorking: false,
+        bestReasoning: 0,
       })),
     };
   }
@@ -115,14 +153,19 @@ export class ScriptedEngine {
       item.clarifyCount++;
       return {
         interviewer: item.interviewer,
-        text: clarify(item.bankQ.question, item.bankQ.category, item.clarifyCount - 1),
+        text: clarify(item.bankQ.question, item.bankQ.category, item.clarifyCount - 1, item.bankQ.check?.kind),
         interruption: false,
         done: false,
       };
     }
 
+    // Numericals and MCQs have one right answer — grade that, not keywords.
+    if (item.bankQ.check) return this.submitGraded(item, answer);
+
     const raw = scoreAnswer(answer, item.bankQ);
     this.lastRaw = raw;
+    this.lastVerdict = null;
+    this.lastAskerId = item.interviewer.id;
     const quality = answerQuality(raw);
 
     // Record/merge the evaluation for this question.
@@ -189,7 +232,14 @@ export class ScriptedEngine {
       return { interviewer: speaker, text, interruption: interrupt, done: false };
     }
 
-    // Move to the next question (or finish).
+    return this.advance(item, reaction, band, answer, raw.matched);
+  }
+
+  /**
+   * Close the current question with `reaction` and hand over to the next one
+   * (or wrap up the interview).
+   */
+  private advance(item: PlannedItem, reaction: string, band: Band, answer: string, matched: string[]): NextLine {
     this.idx++;
     if (this.idx >= this.plan.items.length) {
       const closing = this.company.panel.find((p) => p.style === "warm") ?? item.interviewer;
@@ -202,22 +252,114 @@ export class ScriptedEngine {
     }
 
     // Let what they just said steer where we go next, so the interview reads
-    // as a thread rather than a fixed list being read out in order.
-    this.promoteRelevant(answer, raw.matched);
+    // as a thread rather than a fixed list being read out in order. (Not after
+    // a numerical: "the train takes 12 seconds" shouldn't pull the next train
+    // problem forward.)
+    if (!item.bankQ.check) this.promoteRelevant(answer, matched);
 
     const next = this.plan.items[this.idx];
     const sameInterviewer = next.interviewer.id === item.interviewer.id;
     const link =
-      raw.matched.length && Math.random() < 0.55
-        ? bridge(raw.matched[0], next.bankQ.category === item.bankQ.category)
+      matched.length && Math.random() < 0.55
+        ? bridge(matched[0], next.bankQ.category === item.bankQ.category)
         : null;
-    const parts = [reaction, link, transition(sameInterviewer, next.interviewer, next.bankQ.question)];
+    const parts = [reaction, link, transition(sameInterviewer, next.interviewer, next.bankQ.question, movesOn(reaction))];
     return {
       interviewer: next.interviewer,
       text: parts.filter(Boolean).join(" "),
       interruption: false,
       done: false,
     };
+  }
+
+  /**
+   * A question with one right answer (imported numerical or MCQ). The panel
+   * behaves like a real analytical round: confirms a right answer, often asks
+   * how you got it, gives ONE chance to re-check a wrong answer without
+   * hinting at the key, and asks you to commit if you only talked around it.
+   */
+  private submitGraded(item: PlannedItem, answer: string): NextLine {
+    const q = item.bankQ;
+    const kind = q.check!.kind;
+    const iv = item.interviewer;
+    const stay = (text: string): NextLine => ({ interviewer: iv, text, interruption: false, done: false });
+
+    // They were asked how they got a right answer: credit the working, move on.
+    if (item.awaitingWorking) {
+      item.awaitingWorking = false;
+      const g = gradeAnswer(answer, q);
+      item.bestReasoning = Math.max(item.bestReasoning, g.reasoning);
+      this.recordGraded(item, answer, "correct");
+      return this.advance(item, workingAck(g.reasoning), "strong", answer, []);
+    }
+
+    if (isUnsure(answer)) {
+      item.unsureCount++;
+      this.recordGraded(item, answer, "skipped");
+      if (item.unsureCount === 1) return stay(gradedUnsure(iv, kind, true));
+      return this.advance(item, gradedUnsure(iv, kind, false), "unsure", answer, []);
+    }
+
+    const g = gradeAnswer(answer, q);
+    item.attempts++;
+    item.bestReasoning = Math.max(item.bestReasoning, g.reasoning);
+    this.recordGraded(item, answer, g.verdict);
+
+    if (g.verdict === "correct") {
+      const line = gradedCorrect(iv, g.said);
+      const askChance = ASK_WORKING[this.config.difficulty] ?? 0.75;
+      if (item.bestReasoning < 0.3 && item.followUpsAsked < 1 && q.followUps.length && Math.random() < askChance) {
+        item.awaitingWorking = true;
+        item.followUpsAsked++;
+        return stay(`${line} ${q.followUps[0]}`);
+      }
+      return this.advance(item, line, "strong", answer, []);
+    }
+
+    if (g.verdict === "wrong" || g.verdict === "partial") {
+      if (item.retries < 1) {
+        item.retries++;
+        return stay(g.verdict === "partial" ? gradedPartial() : gradedRecheck(iv, kind));
+      }
+      return this.advance(item, gradedWrongFinal(iv), "weak", answer, []);
+    }
+
+    // Talked around it without committing to a number or an option.
+    if (item.unclearCount < 1) {
+      item.unclearCount++;
+      return stay(gradedCommit(kind));
+    }
+    return this.advance(item, gradedUncommittedFinal(), "ok", answer, []);
+  }
+
+  /** Store the evaluation of a graded answer (later turns on the same question update it). */
+  private recordGraded(item: PlannedItem, answer: string, verdict: Verdict): void {
+    const raw = gradedScore(answer, verdict, item.bestReasoning, item.attempts);
+    this.lastRaw = raw;
+    this.lastVerdict = verdict;
+    this.lastAskerId = item.interviewer.id;
+    const evalRec: AnswerEval = {
+      questionIdx: this.idx,
+      technical: raw.technical,
+      communication: raw.communication,
+      confidence: raw.confidence,
+      depth: raw.depth,
+      structure: raw.structure,
+      notes: VERDICT_NOTE[verdict],
+      missing: [],
+      verdict,
+    };
+    const existing = this.evals.find((e) => e.questionIdx === this.idx);
+    if (!existing) {
+      this.evals.push(evalRec);
+      return;
+    }
+    // Explaining a right answer shouldn't lower how it was delivered.
+    Object.assign(existing, {
+      ...evalRec,
+      communication: Math.max(existing.communication, evalRec.communication),
+      structure: Math.max(existing.structure, evalRec.structure),
+    });
   }
 
   /**
@@ -274,12 +416,19 @@ export class ScriptedEngine {
     const notes: Record<string, string> = {};
     if (!this.lastRaw) return notes;
     const item = this.plan.items[Math.min(this.idx, this.plan.items.length - 1)];
+    const asker = this.lastAskerId ?? item.interviewer.id;
+    if (this.lastVerdict) {
+      // Says whether it was right, never what the right answer is.
+      notes[asker] =
+        this.lastVerdict === "correct" && this.lastRaw.depth >= 8 ? "Correct, with clear working." : VERDICT_NOTE[this.lastVerdict];
+      return notes;
+    }
     const raw = this.lastRaw;
     const q = answerQuality(raw);
     const covered = Math.round(raw.coverage * 100);
     // Notes are visible to the candidate, so they must not name the concepts
     // that were missed — that would give the answer away mid-interview.
-    notes[item.interviewer.id] =
+    notes[asker] =
       q > 0.7
         ? `Strong — hit ${covered}% of key points.`
         : q > 0.45
@@ -293,7 +442,7 @@ export class ScriptedEngine {
     if (!this.lastRaw) return m;
     const item = this.plan.items[Math.min(this.idx, this.plan.items.length - 1)];
     const q = answerQuality(this.lastRaw);
-    m[item.interviewer.id] = q > 0.7 ? "impressed" : q > 0.5 ? "pleased" : q > 0.35 ? "neutral" : "skeptical";
+    m[this.lastAskerId ?? item.interviewer.id] = q > 0.7 ? "impressed" : q > 0.5 ? "pleased" : q > 0.35 ? "neutral" : "skeptical";
     return m;
   }
 
@@ -328,6 +477,7 @@ export class ScriptedEngine {
     const perQuestion: QuestionFeedback[] = this.plan.items.map((it, i) => {
       const e = this.evals.find((ev) => ev.questionIdx === i);
       const answer = answersByIdx[i] ?? "(no answer recorded)";
+      if (it.bankQ.check) return gradedFeedback(it.bankQ, answer, e);
       const strengths: string[] = [];
       const weaknesses: string[] = [];
       if (e) {
@@ -383,8 +533,74 @@ export class ScriptedEngine {
 
 // ---------------- helpers ----------------
 
-/** People-facing categories an HR/recruiting panelist can credibly ask about. */
-const PEOPLE_CATEGORIES: Category[] = ["hr", "behavioral", "resume", "project"];
+/** How often a right-but-bare answer gets "how did you get that?" — rises with difficulty. */
+const ASK_WORKING: Partial<Record<Difficulty, number>> = { beginner: 0.35, intermediate: 0.55 };
+
+/** What the live panel note says after a graded answer. */
+const VERDICT_NOTE: Record<Verdict, string> = {
+  correct: "Correct answer.",
+  partial: "Partly right.",
+  wrong: "Incorrect — noted.",
+  unclear: "No final answer yet.",
+  skipped: "Skipped.",
+};
+
+/** Report feedback for a question with one right answer. */
+function gradedFeedback(q: BankQuestion, answer: string, e: AnswerEval | undefined): QuestionFeedback {
+  const verdict = e?.verdict;
+  const showedWorking = (e?.depth ?? 0) >= 8;
+  const strengths: string[] = [];
+  const weaknesses: string[] = [];
+  if (verdict === "correct") {
+    strengths.push("Got the right answer.");
+    if (showedWorking) strengths.push("Showed clear working.");
+    else weaknesses.push("Say how you got there — panels score the method as much as the number.");
+  } else if (verdict === "partial") {
+    strengths.push("Some of the right options.");
+    weaknesses.push("Missed part of the full set.");
+  } else if (verdict === "wrong") {
+    weaknesses.push("Final answer was incorrect.");
+    if ((e?.depth ?? 0) >= 4) strengths.push("The approach had the right shape.");
+  } else if (verdict === "unclear") {
+    weaknesses.push("Never committed to a final answer.");
+  } else if (verdict === "skipped") {
+    weaknesses.push("Skipped — revise this one.");
+  }
+  if (!strengths.length) strengths.push(e ? "Attempted the question." : "Not reached in the time available.");
+  return {
+    question: q.question,
+    answer,
+    idealAnswer: q.ideal,
+    strengths,
+    weaknesses,
+    missingConcepts: [],
+    betterAnswer: gradedHint(q),
+    confidence: e ? Math.round(answerQuality(e) * 10) : 4,
+    verdict,
+    correctAnswer: q.check ? describeKey(q.check) : undefined,
+  };
+}
+
+function gradedHint(q: BankQuestion): string {
+  const s = q.solution;
+  const setup = s?.formula ? ` Name the relation you're using (${s.formula}).` : "";
+  const trap = s?.commonMistakes?.length ? ` Watch for the classic trap: ${lowerFirst(s.commonMistakes[0])}.` : "";
+  const commit =
+    q.check?.kind === "choice"
+      ? "Commit to one option out loud, then say in a sentence why it beats the others."
+      : "State the final number clearly, with units.";
+  return `${commit}${setup} Then give the one or two steps that get you there — the method is scored as much as the answer.${trap}`;
+}
+
+function lowerFirst(s: string): string {
+  return s.charAt(0).toLowerCase() + s.slice(1).replace(/[.\s]+$/, "");
+}
+
+/**
+ * People-facing categories an HR/recruiting panelist can credibly ask about.
+ * Verbal ability sits here too — HR asking a word-usage question is normal.
+ */
+const PEOPLE_CATEGORIES: Category[] = ["hr", "behavioral", "resume", "project", "verbal"];
 
 /**
  * Adjacent topics used to find a credible asker when nobody on the panel
@@ -412,6 +628,11 @@ const ASKER_FALLBACK: Partial<Record<Category, Category[]>> = {
   project: ["behavioral", "research"],
   behavioral: ["hr", "project"],
   hr: ["behavioral"],
+  aptitude: ["reasoning", "quant", "rapid-fire", "engineering-maths", "case-study", "data-science", "coding"],
+  reasoning: ["aptitude", "quant", "rapid-fire", "case-study", "coding"],
+  verbal: ["hr", "behavioral"],
+  "engineering-maths": ["aptitude", "flight-mechanics", "cfd", "structures", "controls", "quant", "coding"],
+  "cs-fundamentals": ["coding", "system-design", "ml-ai"],
 };
 
 /**
@@ -511,6 +732,8 @@ const LABELS: Record<Category, string> = {
   "data-science": "Data Science", quant: "Quantitative", "case-study": "Case Study", product: "Product",
   behavioral: "Behavioral", hr: "HR / Motivation", resume: "Resume Depth", research: "Research",
   project: "Project Discussion", "rapid-fire": "Rapid Fire",
+  aptitude: "Quantitative Aptitude", reasoning: "Logical Reasoning", verbal: "Verbal Ability",
+  "engineering-maths": "Engineering Maths", "cs-fundamentals": "CS Fundamentals",
 };
 function labelFor(c: Category): string {
   return LABELS[c] ?? c;

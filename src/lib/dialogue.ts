@@ -16,7 +16,7 @@ import type { RawScore } from "./scoring";
  *    not knowing something, and never scold you for missing a keyword.
  */
 
-type Band = "strong" | "ok" | "weak" | "unsure" | "punt";
+export type Band = "strong" | "ok" | "weak" | "unsure" | "punt";
 
 /** Detect an explicit admission of not knowing, as opposed to a bad answer. */
 export function isUnsure(answer: string): boolean {
@@ -83,20 +83,32 @@ const FRAMING: Partial<Record<string, string>> = {
   resume: "Anything from your own CV — pick one and talk me through it.",
   project: "Pick a project of yours and walk me through your part in it.",
   research: "Your own reasoning matters more than the literature here.",
+  aptitude: "Set it up out loud — I want the number and how you got it.",
+  reasoning: "Reason it through step by step, then commit to an answer.",
+  verbal: "Go with your best reading of it, and tell me why.",
+  "engineering-maths": "Set up the maths first — the method matters as much as the result.",
+  "cs-fundamentals": "Explain the idea in plain terms first, then the detail.",
+};
+
+/** Reframes for exactly-graded questions — a calculation, or a pick from options. */
+const GRADED_FRAMING = {
+  numeric: "It's a calculation — set it up and give me the number you get.",
+  choice: "Pick the option you think is right, and tell me why.",
 };
 
 /**
  * Answer a request for clarification: acknowledge, reframe what's being
  * asked, and put the SAME question again. Never moves on, never leaks.
  */
-export function clarify(question: string, category: string, asked: number): string {
+export function clarify(question: string, category: string, asked: number, graded?: "numeric" | "choice"): string {
   const ack = pickFresh([
     "Sure, let me put that another way.",
     "Fair enough — let me rephrase.",
     "No problem, I'll re-frame it.",
     "Of course. Let me be clearer.",
   ]);
-  const frame = FRAMING[category] ?? "Just talk me through how you'd think about it.";
+  // A numerical in an aerodynamics round must not be reframed as "not a number".
+  const frame = graded ? GRADED_FRAMING[graded] : FRAMING[category] ?? "Just talk me through how you'd think about it.";
   // If they're still lost after one rephrase, strip it right back.
   if (asked >= 1) {
     return `${ack} Forget the phrasing for a moment — ${frame} Take it slowly: ${question}`;
@@ -356,7 +368,9 @@ export function reactionTo(
   // "I don't know" — acknowledge, offer one steer, then let it go.
   if (band === "unsure") {
     if (!unsureAlready) {
-      return { text: `${open} ${follow(open, STEERS)}`, band, retry: true };
+      // About to offer a steer, so the acknowledgement mustn't announce a move on.
+      const ack = pickFresh(staying(REACT[interviewer.style].unsure));
+      return { text: `${ack} ${follow(ack, STEERS)}`, band, retry: true };
     }
     return { text: `${open} ${follow(open, MOVE_ON)}`, band, retry: false };
   }
@@ -398,9 +412,13 @@ export function bridge(concept: string | null, sameTopic: boolean): string | nul
 }
 
 /** Handing over to the next question, in this interviewer's voice. */
-export function transition(sameInterviewer: boolean, next: Interviewer, question: string): string {
+export function transition(sameInterviewer: boolean, next: Interviewer, question: string, alreadyMovedOn = false): string {
   if (sameInterviewer) {
-    return `${pick(["Let's move on.", "Next one.", "Okay, different topic.", "Moving on.", "Right —"])} ${question}`;
+    // "No. Moving on." followed by "Moving on." is the panel repeating itself.
+    const opts = alreadyMovedOn
+      ? ["Okay, different topic.", "Right —", "Here's another one."]
+      : ["Let's move on.", "Next one.", "Okay, different topic.", "Moving on.", "Right —"];
+    return `${pick(opts)} ${question}`;
   }
   // Never name the next panelist twice, and never "hand over" to yourself.
   return `${pick([
@@ -443,4 +461,127 @@ export function closer(band: Band, company: string): string {
       ? "Thanks for being straight with me where you weren't sure."
       : "Thanks for taking the time.";
   return `${warm} ${sign} We'll be in touch through ${company} recruitment. Your full report is ready now.`;
+}
+
+/* ---------- exactly-graded questions (numericals and MCQs) ---------- */
+
+/**
+ * Lines for questions with one right answer. Same two rules as above, made
+ * concrete: confirm a right answer (echoing what THEY said is fine), but never
+ * say what the right answer is when they're wrong — offer one re-check, then
+ * move on. The report carries the key and the worked solution.
+ */
+const GRADED_LINES: Record<Interviewer["style"], { correct: string[]; recheck: string[]; wrongFinal: string[] }> = {
+  warm: {
+    correct: ["Yes, that's right.", "Spot on.", "That's correct — nicely done.", "Exactly right."],
+    recheck: ["Hmm, that's not quite what I get. Want to check your working once more?", "Not quite — have another look. Where might it have slipped?"],
+    wrongFinal: ["That's not the one, but no matter — let's keep moving.", "Not quite. That's fine, we'll move on."],
+  },
+  skeptical: {
+    correct: ["Correct.", "Fine — that's right.", "Yes. That checks out."],
+    recheck: ["No. Check it again.", "That's wrong. Go back over your working."],
+    wrongFinal: ["Still not right. We'll move on.", "No. Let's leave it there."],
+  },
+  formal: {
+    correct: ["That is correct.", "Correct.", "Yes, that is the right answer."],
+    recheck: ["That is not correct. Please re-check your working.", "I am afraid that is not right. Reconsider it."],
+    wrongFinal: ["That is not correct. We will move on.", "Incorrect. Let us continue."],
+  },
+  curious: {
+    correct: ["Yes! That's it.", "Right — nice.", "Yep, that's the one."],
+    recheck: ["Hmm, I get something different. Where might it have gone off?", "Interesting — but I'd question that. Take another look?"],
+    wrongFinal: ["Not quite, but let's not dwell on it.", "Hmm, not that one. Let's keep going."],
+  },
+  rapid: {
+    correct: ["Correct.", "Yep.", "Right."],
+    recheck: ["No — try again.", "Wrong. Once more?"],
+    wrongFinal: ["No. Moving on.", "Not it. Next."],
+  },
+};
+
+const RECHECK_OPTION = [
+  "Are you sure about that option? Think it through once more.",
+  "I'd look at that choice again. Which one would you go with?",
+];
+
+export type GradedKind = "numeric" | "choice";
+
+/** Confirm a right answer, sometimes echoing it back. */
+export function gradedCorrect(iv: Interviewer, said?: string): string {
+  const line = pickFresh(GRADED_LINES[iv.style].correct);
+  if (said && Math.random() < 0.5) return `${line.replace(/[.!]$/, "")} — ${said}.`;
+  return line;
+}
+
+/** First wrong answer: one chance to re-check, without a hint at the key. */
+export function gradedRecheck(iv: Interviewer, kind: GradedKind): string {
+  if (kind === "choice" && iv.style !== "rapid" && Math.random() < 0.5) return pickFresh(RECHECK_OPTION);
+  return pickFresh(GRADED_LINES[iv.style].recheck);
+}
+
+/** Still wrong: close the question. Never ends in a question mark. */
+export function gradedWrongFinal(iv: Interviewer): string {
+  return pickFresh(GRADED_LINES[iv.style].wrongFinal);
+}
+
+/** They talked around it without committing to a number / an option. */
+export function gradedCommit(kind: GradedKind): string {
+  return pickFresh(
+    kind === "numeric"
+      ? ["So what number do you actually get?", "And your final answer is…?", "Give me the number you land on."]
+      : ["So which option are you going with?", "Commit to one for me — which option?", "Which one is it, then?"]
+  );
+}
+
+/** Still no committed answer after being asked. */
+export function gradedUncommittedFinal(): string {
+  return pickFresh(["I'll take that as undecided — let's move on.", "Okay, we'll leave that one open.", "Fine — let's keep going."]);
+}
+
+/** Multi-select: some right, none wrong, not all. */
+export function gradedPartial(): string {
+  return pickFresh(["Partly — there's at least one more. Have another look.", "Some of those are right, but not the full set. Anything to add?"]);
+}
+
+/** "I don't know" on a graded question: a steer that restarts them, not a hint. */
+export function gradedSteer(kind: GradedKind): string {
+  return pickFresh(
+    kind === "numeric"
+      ? ["No problem — just set it up for me. What would you compute first?", "That's fine. Talk me through how you'd start it.", "Even the first step is useful. What's the setup?"]
+      : ["That's fine — can you at least rule any of them out?", "No problem. Which options can you eliminate, and why?"]
+  );
+}
+
+/**
+ * "I don't know" on a graded question: acknowledge in this interviewer's voice,
+ * then either steer them into setting it up (first time) or move on.
+ */
+export function gradedUnsure(iv: Interviewer, kind: GradedKind, first: boolean): string {
+  const pool = REACT[iv.style].unsure;
+  const open = pickFresh(first ? staying(pool) : pool);
+  if (first) return `${open} ${gradedSteer(kind)}`;
+  return movesOn(open) ? open : `${open} ${follow(open, MOVE_ON)}`;
+}
+
+/** Does this line already announce that the panel is moving on? */
+export function movesOn(line: string): boolean {
+  return /mov(e|ing) on|skip it|next\b|keep (going|moving)|leave (it|that)/i.test(line);
+}
+
+/**
+ * Acknowledgements that don't announce a move on — "Fine — moving on." then
+ * "What's the setup?" is the panel contradicting itself in one breath.
+ */
+function staying(lines: string[]): string[] {
+  const ok = lines.filter((l) => !/moving on|move on|skip it|next\b/i.test(l));
+  return ok.length ? ok : ["Okay."];
+}
+
+/** After they explain how they got a right answer. */
+export function workingAck(reasoning: number): string {
+  return pickFresh(
+    reasoning >= 0.35
+      ? ["Good — that's clean.", "Right, that's the way to do it.", "Nice, clear working."]
+      : ["Okay — a bit rushed, but the answer's right.", "Fine. Show a little more of the setup next time."]
+  );
 }

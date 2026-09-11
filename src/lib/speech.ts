@@ -279,13 +279,48 @@ export function useSpeechRecognition(onSegment?: (text: string) => void) {
 }
 
 /** Speak text via the Web Speech API. Best-effort; silent if unsupported. */
+/** Spoken forms for symbols the imported numericals are full of. */
+const SAY: [RegExp, string][] = [
+  [/[*_`#]/g, ""],
+  [/√/g, " root "],
+  [/²/g, " squared"],
+  [/³/g, " cubed"],
+  [/π/g, " pi "],
+  [/×/g, " times "],
+  [/−/g, " minus "],
+  [/≈/g, " approximately "],
+  [/≤/g, " at most "],
+  [/≥/g, " at least "],
+  [/₹\s?/g, " rupees "],
+  [/°/g, " degrees"],
+  [/Δ/g, " delta "],
+  [/σ/g, " sigma "],
+  [/τ/g, " tau "],
+  [/ρ/g, " rho "],
+  [/μ/g, " mu "],
+  [/γ/g, " gamma "],
+  [/θ/g, " theta "],
+  [/α/g, " alpha "],
+  [/β/g, " beta "],
+  [/λ/g, " lambda "],
+  [/ω/g, " omega "],
+  [/ε/g, " epsilon "],
+  [/η/g, " eta "],
+  // "(A) No change; (B) ..." — a pause before each option
+  [/\(([A-H])\)/g, ", $1,"],
+];
+
+function speakable(text: string): string {
+  return SAY.reduce((s, [re, to]) => s.replace(re, to), text).replace(/\s+/g, " ").trim();
+}
+
 export function speak(text: string, onEnd?: () => void, voiceHint?: "female" | "male") {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     onEnd?.();
     return;
   }
   window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text.replace(/[*_`#]/g, ""));
+  const u = new SpeechSynthesisUtterance(speakable(text));
   u.rate = 1.02;
   u.pitch = voiceHint === "male" ? 0.9 : 1.05;
   const voices = window.speechSynthesis.getVoices();

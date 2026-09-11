@@ -72,4 +72,24 @@ export const RESOURCES: Record<Category, { title: string; type: string }[]> = {
   ],
   project: [{ title: "Structure project talks: problem → approach → result → impact", type: "Guide" }],
   "rapid-fire": [{ title: "Formula & concept flashcards — spaced repetition", type: "Guide" }],
+  aptitude: [
+    { title: "Myplacement — Quantitative Aptitude tests", type: "Problem Set" },
+    { title: "R.S. Aggarwal — Quantitative Aptitude", type: "Book" },
+  ],
+  reasoning: [
+    { title: "Myplacement — Logical Reasoning & DI tests", type: "Problem Set" },
+    { title: "Arun Sharma — Logical Reasoning and Data Interpretation", type: "Book" },
+  ],
+  verbal: [
+    { title: "Norman Lewis — Word Power Made Easy", type: "Book" },
+    { title: "Wren & Martin — High School English Grammar", type: "Book" },
+  ],
+  "engineering-maths": [
+    { title: "Myplacement — Engineering Maths (GATE) tests", type: "Problem Set" },
+    { title: "Kreyszig — Advanced Engineering Mathematics", type: "Book" },
+  ],
+  "cs-fundamentals": [
+    { title: "Silberschatz — Operating System Concepts", type: "Book" },
+    { title: "Kurose & Ross — Computer Networking: A Top-Down Approach", type: "Book" },
+  ],
 };

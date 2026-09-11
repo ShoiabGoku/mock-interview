@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type {
   AnswerEval,
+  BankQuestion,
   Company,
   Report,
   RoleDef,
@@ -10,7 +11,9 @@ import { modeById } from "@/data/modes";
 import { DIFFICULTIES } from "@/data/modes";
 import type { NextLine } from "./scriptedEngine";
 import { RESOURCES } from "@/data/resources";
-import { categoriesFor } from "@/data/roles";
+import { planCategories } from "@/data/roles";
+import { buildQuestionSet } from "@/data/questionBank";
+import { describeKey } from "./grading";
 
 /**
  * AI interview brain. Runs Claude in the browser with the user's own API key
@@ -50,6 +53,8 @@ export class AIEngine {
   private lastQuestion = "";
   private turnCount = 0;
   private maxQuestions: number;
+  /** Questions drawn from the bank for this session — the AI's primary questions. */
+  private plan: BankQuestion[] = [];
 
   constructor(
     private config: SessionConfig,
@@ -61,13 +66,15 @@ export class AIEngine {
     this.client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
     this.model = model || DEFAULT_MODEL;
     this.maxQuestions = config.durationMin <= 15 ? 5 : config.durationMin <= 30 ? 8 : config.durationMin <= 45 ? 11 : 14;
+    const { categories, weights } = planCategories(role, modeById(config.mode));
+    this.plan = buildQuestionSet(categories, this.maxQuestions, company.id, weights);
     this.system = this.buildSystem();
   }
 
   private buildSystem(): string {
     const mode = modeById(this.config.mode);
     const diff = DIFFICULTIES.find((d) => d.id === this.config.difficulty);
-    const cats = categoriesFor(this.role.focus, mode?.categories ?? null);
+    const { categories: cats } = planCategories(this.role, mode);
     const panel = this.company.panel
       .map((p) => `- ${p.name} (${p.role}, ${p.department}): ${p.personality} Focus: ${p.focus.join(", ")}. Style: ${p.style}.`)
       .join("\n");
@@ -85,6 +92,7 @@ ${panel}
 
 ${this.config.resume ? `CANDIDATE RESUME (ask about this):\n${this.config.resume.slice(0, 4000)}\n` : ""}
 ${this.config.jobDescription ? `JOB DESCRIPTION (tailor questions to this):\n${this.config.jobDescription.slice(0, 3000)}\n` : ""}
+${this.planSection()}
 
 RULES:
 - Exactly ONE panelist speaks per turn. Only one interviewer at a time.
@@ -117,6 +125,24 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no prose, no code fences:
   "eval": { "technical": 0-10, "communication": 0-10, "confidence": 0-10, "depth": 0-10, "structure": 0-10, "notes": "<one line>", "missing": ["concept", ...] }
 }
 On the very first turn there is no answer to evaluate yet — omit "eval". Keep "text" natural and conversational, like real speech.`;
+  }
+
+  /**
+   * The session's question plan, drawn from the same bank as the offline
+   * engine — so the Analytical round really asks the aptitude questions, and
+   * numericals/MCQs are graded against their keys rather than guessed at.
+   */
+  private planSection(): string {
+    if (!this.plan.length) return "";
+    const lines = this.plan.map((q, i) => {
+      const guide = q.check
+        ? `KEY (private): ${describeKey(q.check)}`
+        : `A strong answer covers: ${q.keywords.join(", ")}`;
+      return `${i + 1}. [${q.category}] ${q.question}\n   ${guide}`;
+    });
+    return `QUESTION PLAN — from the candidate's own prep bank. Use these as your primary questions, roughly in this order. Rephrase discussion questions naturally, but for any question with a KEY keep every number, unit and option exactly as written (read the options out). KEYS are private: grade against them and never reveal them before the report. For a KEY question: confirm a right answer (it's fine to ask how they got it); if it's wrong, give ONE chance to re-check without hinting at the answer, then move on; if they never commit, ask for their final answer. Its technical score must reflect whether the final answer matched the key.
+${lines.join("\n")}
+`;
   }
 
   private matchInterviewer(name: string, role: string) {
