@@ -18,7 +18,7 @@ const root = resolve(here, "..");
 const src = resolve(process.argv[2] ?? join(root, "..", "myplacement"), "src/data/questions");
 const dest = join(root, "src/data/placement");
 
-const BANKS = ["aerospace", "mechanics", "resume", "nonCore", "coding", "aptitude", "interview"];
+const BANKS = ["aerospace", "mechanics", "resume", "nonCore", "coding", "aptitude", "interview", "quantHft", "latAero"];
 
 if (!existsSync(src)) {
   console.error(`Myplacement banks not found at ${src}`);

@@ -8,6 +8,8 @@ import { NON_CORE_QUESTIONS } from "./placement/nonCore";
 import { CODING_QUESTIONS } from "./placement/coding";
 import { APTITUDE_QUESTIONS } from "./placement/aptitude";
 import { INTERVIEW_QUESTIONS } from "./placement/interview";
+import { QUANT_HFT_QUESTIONS } from "./placement/quantHft";
+import { LAT_AEROSPACE_QUESTIONS } from "./placement/latAero";
 import { ALREADY_IN_BANK, GRADED_CATEGORY, OPEN_CONVERSIONS } from "./placementCurated";
 
 /**
@@ -32,6 +34,8 @@ const BANKS: Question[] = [
   ...CODING_QUESTIONS,
   ...APTITUDE_QUESTIONS,
   ...INTERVIEW_QUESTIONS,
+  ...QUANT_HFT_QUESTIONS,
+  ...LAT_AEROSPACE_QUESTIONS,
 ];
 
 /** Myplacement topic -> interview category. */
@@ -59,6 +63,13 @@ const TOPIC_CATEGORY: Record<string, Category> = {
   "Engineering Mathematics": "engineering-maths",
   "Numerical Methods": "engineering-maths",
   "Probability & Statistics": "engineering-maths",
+  // LAT Aerospace graduate-engineer bank
+  "STOL Aerodynamics": "aerodynamics",
+  "Electric Propulsion": "propulsion",
+  "Gas Turbine Engines": "propulsion",
+  GNC: "controls",
+  "Autonomy & Defence": "controls",
+  "Structures & FEA": "structures",
   // Role tracks
   "Machine Learning": "ml-ai",
   "Computer Vision": "ml-ai",
@@ -66,6 +77,8 @@ const TOPIC_CATEGORY: Record<string, Category> = {
   "Data Analytics": "data-science",
   "Quantitative Finance": "quant",
   "Investment Banking": "quant",
+  "Market Microstructure": "quant",
+  "HFT Systems": "quant",
   "Consulting & Strategy": "case-study",
   "Software Architecture": "system-design",
   // CS fundamentals vs DSA
