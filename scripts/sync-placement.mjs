@@ -7,7 +7,9 @@
  * Defaults to ../myplacement. Files are copied byte-for-byte (so ₹, √, σ and
  * friends survive) with one change: the `@/lib/types` import is pointed at the
  * local ./types.ts. Re-run this after adding questions in Myplacement, then
- * rebuild — placementBank.ts picks everything up automatically.
+ * rebuild — placementBank.ts picks everything up automatically. A new bank
+ * FILE also needs adding to BANKS below and importing in placementBank.ts, and
+ * any new topic needs a TOPIC_CATEGORY entry there or it lands in UNPLACED.
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
@@ -18,7 +20,7 @@ const root = resolve(here, "..");
 const src = resolve(process.argv[2] ?? join(root, "..", "myplacement"), "src/data/questions");
 const dest = join(root, "src/data/placement");
 
-const BANKS = ["aerospace", "mechanics", "resume", "nonCore", "coding", "aptitude", "interview", "quantHft", "latAero"];
+const BANKS = ["aerospace", "mechanics", "resume", "nonCore", "coding", "aptitude", "interview", "quantHft", "latAero", "airbusFP"];
 
 if (!existsSync(src)) {
   console.error(`Myplacement banks not found at ${src}`);

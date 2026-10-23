@@ -306,6 +306,59 @@ export const OPEN_CONVERSIONS: Record<string, OpenConversion> = {
     followUps: ["What was the obstacle, and what did YOU do about it?", "What number would you put on the result?"],
     keywords: ["situation", "obstacle", "action", "result", "quantified", "ownership"],
   },
+
+  // ---------------- Airbus India Flight Physics bank: soft skills from the JD ----------------
+  "afp-191": {
+    category: "hr",
+    question: "Why Airbus — and why Flight Physics in particular, rather than any other engineering team here?",
+    followUps: [
+      "Which part of this job do you see yourself doing in your first year?",
+      "Which of your projects is closest to that work?",
+      "What do you want to learn here that you couldn't learn anywhere else?",
+    ],
+    keywords: ["aero data", "loads", "performance", "simulation", "project", "learn", "certification"],
+  },
+  "afp-192": {
+    category: "behavioral",
+    question: "Tell me about a time you challenged a result everyone else had accepted. How did you check it, and what changed?",
+    followUps: [
+      "How did you raise it without it becoming personal?",
+      "What if your check had shown the original result was right after all?",
+      "What did you put in place so it wouldn't happen again?",
+    ],
+    keywords: ["evidence", "checked", "verify", "outcome", "improve", "respect", "assumption"],
+  },
+  "afp-193": {
+    category: "behavioral",
+    question: "You have to present a loads result to programme managers who aren't specialists. How do you structure it?",
+    followUps: [
+      "What goes in the main slides, and what stays in backup?",
+      "How do you state the uncertainty without sounding unsure of yourself?",
+      "What if they push you for a yes or no you can't give yet?",
+    ],
+    keywords: ["conclusion", "impact", "figure", "assumptions", "uncertainty", "audience", "decision"],
+  },
+  "afp-194": {
+    category: "behavioral",
+    question:
+      "The loads team says your aero data give unrealistically high tail loads, and you're confident your data are right. What do you do?",
+    followUps: [
+      "What are the first things you'd check at the interface between the two teams?",
+      "And if it turns out the error was yours?",
+      "How do you stop the same mismatch happening again?",
+    ],
+    keywords: ["test case", "together", "reference point", "sign convention", "version", "units", "document"],
+  },
+  "afp-195": {
+    category: "cfd",
+    question: "Your CFD drag comes out 12 counts below the wind-tunnel value for the same configuration. Where do you start?",
+    followUps: [
+      "Which single difference would you bet on first, and why?",
+      "How would you put an uncertainty on the CFD number itself?",
+      "Why not just apply a 12-count correction from now on?",
+    ],
+    keywords: ["like for like", "transition", "reynolds", "support", "wall correction", "reference area", "grid convergence", "uncertainty"],
+  },
 };
 
 /**
@@ -331,6 +384,14 @@ export const ALREADY_IN_BANK: Record<string, string> = {
 };
 
 /**
+ * Myplacement questions that are worth knowing but that no panel would ask.
+ * They're skipped on purpose, with the reason, rather than left in UNPLACED.
+ */
+export const NOT_ASKED: Record<string, string> = {
+  "afp-196": "spotting a fake Airbus offer letter — from the JD's fraud disclaimer, not an interview question",
+};
+
+/**
  * Category overrides for exactly-graded questions whose Myplacement topic
  * doesn't say which interview round they belong to — the resume bank's
  * numericals are drawn from specific CV items.
@@ -341,4 +402,5 @@ export const GRADED_CATEGORY: Record<string, Category> = {
   "res-018": "project", // compressor course project: Euler work
   "res-021": "project", // G-550 drag polar
   "res-025": "project", // JAL 123: Paris law
+  "afp-172": "structures", // Airbus Knowledge: A350 composite share (the topic maps to flight-mechanics)
 };

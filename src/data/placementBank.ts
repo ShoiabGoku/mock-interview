@@ -10,7 +10,8 @@ import { APTITUDE_QUESTIONS } from "./placement/aptitude";
 import { INTERVIEW_QUESTIONS } from "./placement/interview";
 import { QUANT_HFT_QUESTIONS } from "./placement/quantHft";
 import { LAT_AEROSPACE_QUESTIONS } from "./placement/latAero";
-import { ALREADY_IN_BANK, GRADED_CATEGORY, OPEN_CONVERSIONS } from "./placementCurated";
+import { AIRBUS_FP_QUESTIONS } from "./placement/airbusFP";
+import { ALREADY_IN_BANK, GRADED_CATEGORY, NOT_ASKED, OPEN_CONVERSIONS } from "./placementCurated";
 
 /**
  * Every question from the Myplacement prep app, turned into something a panel
@@ -36,6 +37,7 @@ const BANKS: Question[] = [
   ...INTERVIEW_QUESTIONS,
   ...QUANT_HFT_QUESTIONS,
   ...LAT_AEROSPACE_QUESTIONS,
+  ...AIRBUS_FP_QUESTIONS,
 ];
 
 /** Myplacement topic -> interview category. */
@@ -70,6 +72,19 @@ const TOPIC_CATEGORY: Record<string, Category> = {
   GNC: "controls",
   "Autonomy & Defence": "controls",
   "Structures & FEA": "structures",
+  // Airbus India Flight Physics bank
+  "Aero Shape Design": "aerodynamics",
+  "Aero Data & Modelling": "aerodynamics",
+  CFD: "cfd",
+  "Aircraft Loads": "structures",
+  "Structural Dynamics & Aeroelasticity": "structures",
+  "Aircraft Performance": "flight-mechanics",
+  "Performance Certification": "flight-mechanics",
+  "Aircraft Design": "flight-mechanics",
+  "Flight Simulation": "flight-mechanics",
+  "Sustainable Aviation": "propulsion",
+  "Airbus Knowledge": "flight-mechanics", // afp-172 (A350 composites) overridden to structures
+  "Scientific Computing": "coding", // MATLAB/NumPy/UNIX — the JD's tooling, asked in the coding slot
   // Role tracks
   "Machine Learning": "ml-ai",
   "Computer Vision": "ml-ai",
@@ -237,7 +252,7 @@ function toOpen(q: Question): BankQuestion {
 export const UNPLACED: string[] = [];
 
 export const PLACEMENT_QUESTIONS: BankQuestion[] = BANKS.flatMap((q): BankQuestion[] => {
-  if (ALREADY_IN_BANK[q.id]) return [];
+  if (ALREADY_IN_BANK[q.id] || NOT_ASKED[q.id]) return [];
   if (OPEN_CONVERSIONS[q.id]) return [toOpen(q)];
   const category = categoryOf(q);
   if (!category) {
