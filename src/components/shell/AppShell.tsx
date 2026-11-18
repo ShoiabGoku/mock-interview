@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BarChart3, Home, Moon, Settings2, Sun, Users } from "lucide-react";
+import { BarChart3, Home, MessagesSquare, Moon, Settings2, Sun, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Home", icon: Home },
   { href: "/setup", label: "New Interview", icon: Users },
+  { href: "/gd", label: "Group Discussion", icon: MessagesSquare },
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
@@ -28,8 +29,8 @@ function useTheme() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { dark, toggle } = useTheme();
-  // The live interview room is distraction-free (no chrome).
-  const fullscreen = pathname.startsWith("/interview");
+  // The live interview and discussion rooms are distraction-free (no chrome).
+  const fullscreen = pathname.startsWith("/interview") || pathname.startsWith("/gd/room");
 
   if (fullscreen) return <main className="min-h-screen">{children}</main>;
 
@@ -44,7 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </Link>
         {NAV.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+          const active = href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
               key={href}

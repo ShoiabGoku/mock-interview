@@ -18,7 +18,7 @@ export default function SettingsPage() {
   const settings = useStore((s) => s.settings);
   const update = useStore((s) => s.updateSettings);
   const clearHistory = useStore((s) => s.clearHistory);
-  const historyLen = useStore((s) => s.history.length);
+  const historyLen = useStore((s) => s.history.length + s.gdHistory.length);
   const [show, setShow] = useState(false);
 
   if (!hydrated) return <div className="p-10 text-center text-muted">Loading…</div>;
@@ -73,6 +73,18 @@ export default function SettingsPage() {
       </Card>
 
       <Card className="mt-4">
+        <CardTitle>Room</CardTitle>
+        <p className="mt-2 text-sm text-muted">
+          How the interview and group-discussion rooms look. Your camera only shows you to yourself — nothing is recorded or uploaded.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-4">
+          <Toggle label="Turn my camera on in the room" checked={settings.cameraOn} onChange={(v) => update({ cameraOn: v })} />
+          <Toggle label="Live captions" checked={settings.captions} onChange={(v) => update({ captions: v })} />
+          <Toggle label="Video-call grid instead of an in-person room" checked={settings.roomView === "grid"} onChange={(v) => update({ roomView: v ? "grid" : "room" })} />
+        </div>
+      </Card>
+
+      <Card className="mt-4">
         <CardTitle className="flex items-center gap-1.5"><ShieldCheck size={14} /> Privacy</CardTitle>
         <p className="mt-2 text-sm text-muted">
           This app is a static site with no backend. Your resume, answers, transcripts, scores and API key live only on
@@ -82,7 +94,7 @@ export default function SettingsPage() {
 
       <Card className="mt-4">
         <CardTitle>Data</CardTitle>
-        <p className="mt-2 text-sm text-muted">{historyLen} saved interview{historyLen === 1 ? "" : "s"}.</p>
+        <p className="mt-2 text-sm text-muted">{historyLen} saved session{historyLen === 1 ? "" : "s"} (interviews and group discussions).</p>
         <Button variant="danger" size="sm" className="mt-3" onClick={() => {
           if (confirm("Delete all saved interviews? This cannot be undone.")) clearHistory();
         }}>

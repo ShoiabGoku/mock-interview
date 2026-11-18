@@ -13,6 +13,7 @@ import { COMPANIES, companyById } from "@/data/companies";
 import { ROLES, roleById } from "@/data/roles";
 import { MODES, DIFFICULTIES } from "@/data/modes";
 import { useStore, useHydrated } from "@/store/useStore";
+import { CameraCheck } from "@/components/room/CameraCheck";
 import type { Difficulty } from "@/lib/types";
 
 const DURATIONS = [15, 30, 45, 60];
@@ -23,6 +24,7 @@ export default function SetupPage() {
   const hydrated = useHydrated();
   const setPendingConfig = useStore((s) => s.setPendingConfig);
   const hasKey = useStore((s) => s.settings.apiKey.length > 0);
+  const userName = useStore((s) => s.settings.userName);
 
   const [step, setStep] = useState(0);
   const [companyId, setCompanyId] = useState("");
@@ -125,6 +127,11 @@ export default function SetupPage() {
                 <div className="text-[11px] text-muted">{m.description}</div>
               </button>
             ))}
+            <Link href="/gd" className="glass glass-hover rounded-2xl border border-dashed border-primary/40 p-4 text-left">
+              <div className="text-xl">👥</div>
+              <div className="mt-1.5 text-sm font-semibold">Group Discussion</div>
+              <div className="text-[11px] text-muted">A table of candidates, a topic and two assessors — opens the GD room.</div>
+            </Link>
           </div>
         )}
 
@@ -170,6 +177,10 @@ export default function SetupPage() {
               <textarea value={jd} onChange={(e) => setJd(e.target.value)} rows={4}
                 placeholder="Paste job description…"
                 className="glass mt-2 w-full rounded-xl px-3 py-2 text-sm outline-none" />
+            </Card>
+            <Card>
+              <p className="mb-3 text-sm font-semibold">Camera &amp; microphone check</p>
+              <CameraCheck name={userName} />
             </Card>
             <Card className="bg-primary-soft/30">
               <div className="text-sm">

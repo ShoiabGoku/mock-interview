@@ -12,6 +12,8 @@ Instead of one interviewer, you sit in front of a **panel** — each with a name
 - **20 roles** (SWE, Data Scientist, AI/ML, Aerodynamics, CFD, Structures, Propulsion, Thermal, GNC, Consultant, PM, Quant, GET, Scientist, PhD, MS…) and **13 interview modes** (Technical, Analytical / Aptitude, HR, Behavioral, Resume Deep Dive, Project, Coding, System Design, Case Study, Research, Rapid Fire, Mixed, Final Hiring Committee).
 - **640+ questions**: a hand-written bank of discussion questions plus **every question from the [Myplacement](https://shoiabgoku.github.io/Myplacement/) prep app**. Each round draws from matching questions: the **Analytical round** asks quant aptitude, logical reasoning, puzzles and verbal ability; the **Technical round** mixes discussion questions with GATE-style numericals and MCQs from your role's technical areas (and never drifts into HR); the Resume and Project rounds grill you on the CV-specific questions.
 - **Exact grading for numericals and MCQs**: say the number (digits, words, fractions, "2.2 lakh", "3 × 10^5") or the option ("B", "option c", "the second one", or its text). The panel confirms a right answer, gives one chance to re-check a wrong one *without revealing it*, and asks you to commit if you only talked around it. The report shows the correct answer and Myplacement's worked solution.
+- **Group Discussion round** — sit at an oval table with 4–7 other candidates and two assessors. The moderator reads the rules and the topic, you get thinking time, then it's a live discussion: initiate, make points, build on or counter others by name, cut in politely, bring quiet people in, and volunteer the closing summary. 28 topics across technology, business, economy, society, energy, **aerospace & defence**, abstract and case-based GDs (with an AI key, any topic). Three group types — friendly, competitive, aggressive — change how often people interrupt, whether anyone invites you in, and how long they wait while you compose. The report scores initiation, airtime share, content, listening, leadership, communication, conduct and your summary, tags every contribution, and lists the points you could have raised.
+- **A real room, with your camera** — interviews and GDs happen in a quiet, daylight meeting room: animated panelists who blink, breathe, turn toward whoever is speaking, nod, and move their lips; name cards on the table; live captions; distinct voices for every person. Your webcam appears in the corner (mirrored, never recorded or uploaded). Switch to a video-call grid for online rounds.
 - **6 difficulty levels** from Beginner to Research Scientist.
 - **Type or speak** your answers (browser speech-to-text) and hear the panel speak back (text-to-speech).
 - Optional **resume** and **job-description** paste to tailor and grill.
@@ -46,7 +48,10 @@ src/
     placement/    #   Myplacement's question banks, copied verbatim by scripts/sync-placement.mjs
     placementBank.ts     # turns them into interview questions (round/category, spoken form, answer key)
     placementCurated.ts  # hand conversions of interview/resume questions into open ones
-  lib/            # types, scripted engine, AI engine, orchestrator, scoring, grading, speech
+  data/gd/        # group-discussion topics (points, facts, counters), participants, moderators
+  components/room # the meeting room: animated avatars, camera self-view, room/grid stage, camera check
+  lib/            # types, scripted engine, AI engine, orchestrator, scoring, grading, speech, voices, camera
+    gd/           #   group-discussion engine, scoring, and the optional Claude-driven group
   store/          # zustand store (settings, history, pending config)
 scripts/
   sync-placement.mjs     # re-copy the banks from ../myplacement

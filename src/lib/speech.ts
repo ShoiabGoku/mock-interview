@@ -310,7 +310,7 @@ const SAY: [RegExp, string][] = [
   [/\(([A-H])\)/g, ", $1,"],
 ];
 
-function speakable(text: string): string {
+export function speakable(text: string): string {
   return SAY.reduce((s, [re, to]) => s.replace(re, to), text).replace(/\s+/g, " ").trim();
 }
 

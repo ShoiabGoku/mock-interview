@@ -6,7 +6,7 @@ import {
   Bar, BarChart, CartesianGrid, Line, LineChart, PolarAngleAxis, PolarGrid,
   Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { ArrowRight, Flame, Trophy } from "lucide-react";
+import { ArrowRight, Flame, MessagesSquare, Trophy } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ const TIP = { backgroundColor: "var(--background)", border: "1px solid var(--car
 export default function DashboardPage() {
   const hydrated = useHydrated();
   const history = useStore((s) => s.history);
+  const gdHistory = useStore((s) => s.gdHistory);
 
   const latest = history[0]?.report;
   const chrono = useMemo(() => [...history].reverse(), [history]);
@@ -58,8 +59,8 @@ export default function DashboardPage() {
   }, [history]);
 
   const streak = useMemo(() => {
-    if (!history.length) return 0;
-    const days = new Set(history.map((s) => new Date(s.startedAt).toDateString()));
+    if (!history.length && !gdHistory.length) return 0;
+    const days = new Set([...history, ...gdHistory].map((s) => new Date(s.startedAt).toDateString()));
     let count = 0;
     const d = new Date();
     // allow today or yesterday to start the streak
@@ -68,20 +69,21 @@ export default function DashboardPage() {
       if (days.has(d.toDateString())) { count++; d.setDate(d.getDate() - 1); } else break;
     }
     return count;
-  }, [history]);
+  }, [history, gdHistory]);
 
   const best = history.reduce((m, s) => Math.max(m, s.report?.overall ?? 0), 0);
 
   if (!hydrated) return <div className="p-10 text-center text-muted">Loading…</div>;
 
-  if (history.length === 0) {
+  if (history.length === 0 && gdHistory.length === 0) {
     return (
       <div className="mx-auto max-w-lg py-16 text-center">
         <p className="text-lg font-semibold">No interviews yet</p>
-        <p className="mt-2 text-sm text-muted">Complete a mock interview and your performance analytics appear here — radar, trends, company breakdown and streaks.</p>
-        <Link href="/setup" className="mt-4 inline-block">
-          <Button>Start your first interview <ArrowRight size={16} /></Button>
-        </Link>
+        <p className="mt-2 text-sm text-muted">Complete a mock interview or group discussion and your performance analytics appear here — radar, trends, company breakdown and streaks.</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <Link href="/setup"><Button>Start an interview <ArrowRight size={16} /></Button></Link>
+          <Link href="/gd"><Button variant="outline">Try a group discussion</Button></Link>
+        </div>
       </div>
     );
   }
@@ -89,7 +91,7 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-6xl pb-10">
       <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Performance Dashboard</h1>
-      <p className="mt-1 text-sm text-muted">{history.length} interview{history.length === 1 ? "" : "s"} analyzed · scores are AI estimates of performance, not hiring outcomes.</p>
+      <p className="mt-1 text-sm text-muted">{history.length} interview{history.length === 1 ? "" : "s"}{gdHistory.length ? ` and ${gdHistory.length} group discussion${gdHistory.length === 1 ? "" : "s"}` : ""} analyzed · scores are AI estimates of performance, not hiring outcomes.</p>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-4">
         <Card className="flex flex-col items-center justify-center">
@@ -164,7 +166,32 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <h2 className="mt-8 text-lg font-bold">Interview History</h2>
+      {gdHistory.length > 0 && (
+        <>
+          <h2 className="mt-8 flex items-center gap-2 text-lg font-bold"><MessagesSquare size={18} /> Group Discussions</h2>
+          <div className="mt-3 flex flex-col gap-2">
+            {gdHistory.map((g) => (
+              <Link key={g.id} href={`/gd/report/?id=${g.id}`}>
+                <Card hover className="flex items-center justify-between p-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">“{g.topic.title}”</p>
+                    <p className="text-xs text-muted">
+                      {g.companyName} · {g.config.difficulty} group of {g.config.groupSize} · {new Date(g.startedAt).toLocaleDateString()}
+                      {g.report ? ` · ${Math.round(g.report.yourShare * 100)}% airtime` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge tone={(g.report?.overall ?? 0) >= 60 ? "success" : "warning"}>{g.report?.overall ?? 0}</Badge>
+                    <ArrowRight size={16} className="text-muted" />
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+
+      {history.length > 0 && <h2 className="mt-8 text-lg font-bold">Interview History</h2>}
       <div className="mt-3 flex flex-col gap-2">
         {history.map((s) => {
           const c = companyById(s.config.companyId);

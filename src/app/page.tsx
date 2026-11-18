@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Brain, Mic, Sparkles, Users2, BarChart3, Shield } from "lucide-react";
+import { ArrowRight, Brain, Camera, Mic, MessagesSquare, Sparkles, Users2, BarChart3, Shield } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { COMPANIES } from "@/data/companies";
@@ -10,6 +10,8 @@ import { useHydrated, useStore } from "@/store/useStore";
 
 const FEATURES = [
   { icon: Users2, title: "AI Hiring Panel", body: "Multiple interviewers with distinct personalities — a coder, a bar raiser, an HR partner — who question, challenge, and interrupt like the real thing." },
+  { icon: MessagesSquare, title: "Group Discussions", body: "Sit at a table with 4–7 other candidates and two assessors. Initiate, build on others, cut in politely and summarise — scored on what GD assessors actually look for." },
+  { icon: Camera, title: "A real room, with your camera", body: "A quiet, daylight meeting room where the panel looks at whoever is speaking, with your own camera in the corner — or switch to a video-call grid." },
   { icon: Brain, title: "Adaptive & Realistic", body: "With your Claude API key the panel adapts to every answer: sharp follow-ups, cross-questions, and pressure that scales with difficulty." },
   { icon: Mic, title: "Type or Speak", body: "Answer by typing or by voice with speech-to-text, and hear interviewers speak back. Practise thinking out loud." },
   { icon: BarChart3, title: "Deep Feedback", body: "Per-question strengths, gaps, ideal answers, and a full report — technical, communication, confidence, readiness — plus an AI coach and study plan." },
@@ -48,9 +50,9 @@ export default function HomePage() {
               Start a mock interview <ArrowRight size={18} />
             </Button>
           </Link>
-          <Link href="/dashboard">
+          <Link href="/gd">
             <Button size="lg" variant="outline">
-              View dashboard
+              Practise a group discussion
             </Button>
           </Link>
         </div>

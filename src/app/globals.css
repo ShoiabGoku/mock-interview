@@ -114,3 +114,58 @@ input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* ---------- Room avatars (components/room/Avatar.tsx) ---------- */
+.av-breathe { animation: av-breathe 4.5s ease-in-out infinite; transform-box: view-box; transform-origin: 100px 230px; }
+.av-sway { animation: av-sway 7s ease-in-out infinite; transform-box: view-box; transform-origin: 100px 140px; }
+.av-eye { animation: av-blink 4.6s infinite; transform-box: fill-box; transform-origin: center; }
+.av-mouth { animation: av-talk 0.36s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center top; }
+.av-nod { animation: av-nod 1.3s ease-in-out 1; transform-box: view-box; transform-origin: 100px 140px; }
+.av-talk-head { animation: av-talk-head 2.4s ease-in-out infinite; transform-box: view-box; transform-origin: 100px 140px; }
+
+@keyframes av-breathe { 0%, 100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(-0.8px) scaleY(1.004); } }
+@keyframes av-sway { 0%, 100% { transform: rotate(0deg); } 30% { transform: rotate(1.1deg); } 70% { transform: rotate(-0.9deg); } }
+@keyframes av-blink { 0%, 93%, 100% { transform: scaleY(1); } 95.5% { transform: scaleY(0.08); } }
+@keyframes av-talk {
+  0% { transform: scaleY(0.25); }
+  35% { transform: scaleY(0.85); }
+  60% { transform: scaleY(0.45); }
+  100% { transform: scaleY(1); }
+}
+@keyframes av-nod { 0%, 100% { transform: rotate(0deg) translateY(0); } 25% { transform: rotate(0deg) translateY(3px); } 50% { transform: translateY(-0.5px); } 75% { transform: translateY(2px); } }
+@keyframes av-talk-head { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-1.4deg); } 60% { transform: rotate(1.2deg); } }
+
+/* ---------- Room scene ---------- */
+.room-wall {
+  background:
+    radial-gradient(120% 70% at 18% 0%, rgba(255, 252, 240, 0.85), transparent 60%),
+    linear-gradient(180deg, #eceae4 0%, #e3e0d8 62%, #d9d4ca 100%);
+}
+.room-window {
+  background:
+    linear-gradient(90deg, transparent 49.2%, rgba(255, 255, 255, 0.9) 49.2%, rgba(255, 255, 255, 0.9) 50.8%, transparent 50.8%),
+    linear-gradient(0deg, transparent 54%, rgba(255, 255, 255, 0.9) 54%, rgba(255, 255, 255, 0.9) 56%, transparent 56%),
+    linear-gradient(180deg, #cfe3f3 0%, #e7f1f8 55%, #dfe9e2 56%, #c9d9c4 100%);
+  box-shadow: inset 0 0 0 6px #f7f6f2, 0 10px 40px rgba(255, 250, 230, 0.6);
+}
+.room-table {
+  background: radial-gradient(120% 140% at 50% 0%, #c79a6b 0%, #a87a4f 45%, #835a37 100%);
+  box-shadow: 0 -2px 0 rgba(255, 255, 255, 0.25) inset, 0 18px 40px rgba(40, 25, 10, 0.35);
+}
+.room-tent {
+  background: linear-gradient(180deg, #ffffff 0%, #ecebe6 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.tile-bg-0 { background: radial-gradient(90% 90% at 30% 20%, #f3efe6, #d8d2c5); }
+.tile-bg-1 { background: linear-gradient(160deg, #dfe8ee 0%, #c9d6de 100%); }
+.tile-bg-2 { background: linear-gradient(90deg, #8a6f55 0 12%, #e9e2d5 12% 100%); }
+.tile-bg-3 { background: radial-gradient(80% 80% at 70% 30%, #eef1ea, #cfd6c8); }
+.tile-bg-4 { background: linear-gradient(180deg, #e8e4ee 0%, #d4cfdd 100%); }
+.tile-bg-5 { background: linear-gradient(135deg, #f1e9df 0%, #ddd0bf 100%); }
+
+@keyframes speaker-ring { 0%, 100% { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.9), 0 0 0 6px rgba(16, 185, 129, 0.15); } 50% { box-shadow: 0 0 0 2px rgba(16, 185, 129, 1), 0 0 0 10px rgba(16, 185, 129, 0.05); } }
+.speaker-ring { animation: speaker-ring 1.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .av-sway, .av-breathe, .av-talk-head, .av-nod, .speaker-ring { animation: none !important; }
+}
